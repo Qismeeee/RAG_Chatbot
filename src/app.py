@@ -1,67 +1,101 @@
-import streamlit as st
-import requests
-from PIL import Image
-import io
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+import sqlite3
+import os
 
-# Thiết lập tiêu đề ứng dụng
-st.title("Chatbot Hỏi Đáp Nội Quy Trường")
-
-# URL của FastAPI server (điều chỉnh tùy thuộc vào cấu hình server của bạn)
-FASTAPI_URL = "http://localhost:8000/api"
-
-# Phần phản hồi streaming
+app = FastAPI()
+db_path = os.path.abspath("documents.db")
 
 
-def stream_response(response):
-    for chunk in response.iter_content(chunk_size=1024):
-        if chunk:
-            st.write(chunk.decode("utf-8"))
+class Query(BaseModel):
+    question: str
+    session_id: str
 
 
-# Chọn chế độ tương tác: Văn bản, Hình ảnh, hoặc Âm thanh
-interaction_type = st.sidebar.selectbox(
-    "Chọn kiểu tương tác",
-    ["Text", "Image", "Audio"]
-)
+class Document(BaseModel):
+    file_id: str
+    filename: str
+    source: str
+    chunk_number: int
+    doc_id: str
+    embedding: bytes
 
-# Xử lý câu hỏi dạng văn bản
-if interaction_type == "Text":
-    st.header("Nhập câu hỏi của bạn dưới dạng văn bản")
-    user_text = st.text_input("Câu hỏi:")
-    if st.button("Gửi"):
-        # Gửi yêu cầu đến FastAPI
-        response = requests.post(
-            f"{FASTAPI_URL}/text/search", json={"query": user_text}, stream=True)
-        st.write("Đang tìm kiếm câu trả lời...")
-        stream_response(response)
 
-# Xử lý yêu cầu dạng hình ảnh
-elif interaction_type == "Image":
-    st.header("Tải lên hình ảnh để hỏi đáp")
-    image_file = st.file_uploader("Chọn ảnh", type=["jpg", "jpeg", "png"])
-    if image_file is not None:
-        image = Image.open(image_file)
-        st.image(image, caption="Ảnh của bạn", use_column_width=True)
-        if st.button("Gửi"):
-            # Đọc ảnh thành bytes
-            image_bytes = image_file.read()
-            # Gửi yêu cầu đến FastAPI
-            response = requests.post(
-                f"{FASTAPI_URL}/image/search", files={"file": image_bytes}, stream=True)
-            st.write("Đang xử lý hình ảnh...")
-            stream_response(response)
+@app.post("/query/")
+async def get_api_response(query: Query):
+    response_text = f"Received query: {query.question} with session ID: {query.session_id}"
+    return {
+        "session_id": query.session_id,
+        "answer": response_text,
+        "model": "mock_model"
+    }
 
-# Xử lý yêu cầu dạng âm thanh
-elif interaction_type == "Audio":
-    st.header("Ghi âm hoặc tải lên tệp âm thanh")
-    audio_file = st.file_uploader("Chọn tệp âm thanh", type=["wav", "mp3"])
-    if audio_file is not None:
-        st.audio(audio_file, format="audio/wav")
-        if st.button("Gửi"):
-            # Đọc âm thanh thành bytes
-            audio_bytes = audio_file.read()
-            # Gửi yêu cầu đến FastAPI
-            response = requests.post(
-                f"{FASTAPI_URL}/speech/search", files={"file": audio_bytes}, stream=True)
-            st.write("Đang xử lý âm thanh...")
-            stream_response(response)
+# Thêm bản ghi vào bảng
+
+
+@app.post("/embeddings/")
+async def add_document(embedding: Document):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO documents (file_id, filename, source, chunk_number, doc_id, embedding)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (embedding.file_id, embedding.filename, embedding.source, embedding.chunk_number, embedding.doc_id, embedding.embedding))
+    conn.commit()
+    conn.close()
+    return {"message": "Document added successfully"}
+
+# Lấy tất cả bản ghi từ bảng
+
+
+@app.get("/embeddings/")
+async def get_all_embeddings():
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM documents')
+    rows = cursor.fetchall()
+    conn.close()
+    return {"Document": rows}
+
+# Lấy một bản ghi theo file_id
+
+
+@app.get("/embeddings/{file_id}")
+async def get_embedding(file_id: str):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM documents WHERE file_id = ?', (file_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return {"embedding": row}
+    else:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+# Xóa một bản ghi theo file_id
+
+
+@app.delete("/embeddings/{file_id}")
+async def delete_embedding(file_id: str):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM documents WHERE file_id = ?', (file_id,))
+    conn.commit()
+    conn.close()
+    return {"Message": "Document deleted successfully"}
+
+# Cập nhật một bản ghi
+
+
+@app.put("/embeddings/{file_id}")
+async def update_document(file_id: str, embedding: Document):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE documents
+        SET filename = ?, source = ?, chunk_number = ?, doc_id = ?, embedding = ?
+        WHERE file_id = ?
+    ''', (embedding.filename, embedding.source, embedding.chunk_number, embedding.doc_id, embedding.embedding, file_id))
+    conn.commit()
+    conn.close()
+    return {"Message": "Document updated successfully"}

@@ -11,17 +11,20 @@ def generate_doc_id(text, source, chunk_number):
 
 
 def load_text_content(file_path):
+    """Load text content from a .txt file."""
     with open(file_path, 'r', encoding='utf-8') as f:
         return f.read()
 
 
 def load_json_content(file_path):
+    """Load content and metadata from a .json file."""
     with open(file_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
     return data["content"], data["metadata"]
 
 
 def chunk_text_with_splitter(text, chunk_size=512, chunk_overlap=50):
+    """Split text into chunks using RecursiveCharacterTextSplitter."""
     text_splitter = RecursiveCharacterTextSplitter(
         separators=["\n\n", "\n", " ", ""],
         chunk_size=chunk_size,
@@ -31,19 +34,28 @@ def chunk_text_with_splitter(text, chunk_size=512, chunk_overlap=50):
     return text_splitter.split_text(text)
 
 
-def chunk_documents(input_dir, output_dir, chunk_size=512, chunk_overlap=50):
+def chunk_documents(input_dir, output_dir, processed_files_path, chunk_size=512, chunk_overlap=50):
     os.makedirs(output_dir, exist_ok=True)
+    processed_files = load_processed_files(processed_files_path)
 
     for filename in os.listdir(input_dir):
         file_path = os.path.join(input_dir, filename)
         base_filename = os.path.splitext(filename)[0]
 
+        # Tính hash của tệp
+        file_hash = compute_file_hash(file_path)
+
+        # Kiểm tra xem tệp đã được xử lý chưa
+        if filename in processed_files and processed_files[filename] == file_hash:
+            print(f"File {filename} đã được chunking trước đó. Bỏ qua.")
+            continue  # Bỏ qua tệp đã được xử lý
+
+        # Tiến hành xử lý tệp
         if filename.endswith(".txt"):
             text = load_text_content(file_path)
             metadata = {"source": filename, "original_text": text}
         elif filename.endswith(".json"):
             text, metadata = load_json_content(file_path)
-            # Ensure original_text is available
             metadata["original_text"] = text
         else:
             continue
@@ -55,7 +67,8 @@ def chunk_documents(input_dir, output_dir, chunk_size=512, chunk_overlap=50):
             chunk_metadata = metadata.copy()
             chunk_metadata.update({
                 "chunk_number": i,
-                "doc_id": generate_doc_id(chunk, filename, i)
+                "doc_id": generate_doc_id(chunk, filename, i),
+                "filename": filename  # Add filename to metadata
             })
 
             output_data = {
@@ -70,9 +83,39 @@ def chunk_documents(input_dir, output_dir, chunk_size=512, chunk_overlap=50):
 
             print(f"Saved chunk {i} to {output_path}")
 
+        # Cập nhật thông tin tệp đã xử lý
+        processed_files[filename] = file_hash
 
-# Example usage
+    # Lưu lại danh sách tệp đã xử lý
+    save_processed_files(processed_files, processed_files_path)
+
+# Các hàm hỗ trợ cho xử lý file đã được xử lý
+
+
+def compute_file_hash(file_path):
+    hasher = hashlib.md5()
+    with open(file_path, 'rb') as afile:
+        buf = afile.read()
+        hasher.update(buf)
+    return hasher.hexdigest()
+
+
+def load_processed_files(processed_files_path):
+    if os.path.exists(processed_files_path):
+        with open(processed_files_path, 'r') as f:
+            return json.load(f)
+    else:
+        return {}
+
+
+def save_processed_files(processed_files, processed_files_path):
+    with open(processed_files_path, 'w') as f:
+        json.dump(processed_files, f, indent=4)
+
+
+# Sử dụng
 if __name__ == "__main__":
-    input_directory = "D:/HK1_2024-2025/Chatbot/Chat/data/corrected"
-    output_directory = "D:/HK1_2024-2025/Chatbot/Chat/data/chunks"
-    chunk_documents(input_directory, output_directory)
+    input_directory = "data/corrected"
+    output_directory = "data/chunks"
+    processed_files_json = "data/processed_files_chunking.json"
+    chunk_documents(input_directory, output_directory, processed_files_json)
