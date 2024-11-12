@@ -5,7 +5,7 @@ import os
 from sentence_transformers import SentenceTransformer
 
 
-class FAISSIndex:
+class FaissIndex:
     def __init__(self, dimension):
         self.dimension = dimension
         self.index = faiss.IndexFlatL2(dimension)
@@ -39,19 +39,19 @@ class FAISSIndex:
         return results
 
 
-# Ví dụ sử dụng
-if __name__ == "__main__":
-    dimension = 384
-    faiss_index = FAISSIndex(dimension)
+# # Ví dụ sử dụng
+# if __name__ == "__main__":
+#     dimension = 384
+#     faiss_index = FAISSIndex(dimension)
 
-    embeddings_file = "D:/HK1_2024-2025/Chatbot/Chat/data/embeddings/embeddings.json"
-    faiss_index.add_embeddings_from_json(embeddings_file)
+#     embeddings_file = "D:/HK1_2024-2025/Chatbot/Chat/data/embeddings/embeddings.json"
+#     faiss_index.add_embeddings_from_json(embeddings_file)
 
-    query = "Học bổng khuyến khích học tập dành cho ai?"
-    model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
-    query_embedding = model.encode(query)
+#     query = "Học bổng khuyến khích học tập dành cho ai?"
+#     model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+#     query_embedding = model.encode(query)
 
-    results = faiss_index.search(query_embedding, top_k=5)
-    print("Kết quả tìm kiếm:")
-    for result in results:
-        print(f"Score: {result['score']}, Metadata: {result['metadata']}")
+#     results = faiss_index.search(query_embedding, top_k=5)
+#     print("Kết quả tìm kiếm:")
+#     for result in results:
+#         print(f"Score: {result['score']}, Metadata: {result['metadata']}")
