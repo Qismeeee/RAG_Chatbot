@@ -1,132 +1,134 @@
-# src/streamlit_app.py
-
+# === IMPORT CÁC THƯ VIỆN CẦN THIẾT ===
 import streamlit as st
-import requests
-import asyncio
-import uuid
-from streamlit_chat import message
+from dotenv import load_dotenv
+import PyPDF2
+import numpy as np
+# Import the search function
+from search_embeddings import search_milvus, connect_to_milvus
+from langchain_openai import OpenAIEmbeddings
 
-st.set_page_config(
-    page_title="Chatbot Hỏi Đáp Nội Quy Trường Học",
-    page_icon=":robot_face:",
-    layout="wide",
-)
+# === THIẾT LẬP GIAO DIỆN TRANG WEB ===
 
-# Ẩn menu và footer của Streamlit
-hide_streamlit_style = """
-    <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    </style>
-    """
-st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-# Khởi tạo session_state nếu chưa có
-if 'session_id' not in st.session_state:
-    st.session_state['session_id'] = str(uuid.uuid4())
-if 'chat_history' not in st.session_state:
-    st.session_state['chat_history'] = []
-if 'input_question' not in st.session_state:
-    st.session_state['input_question'] = ""
-
-session_id = st.session_state['session_id']
-
-# Sidebar để tải lên tài liệu và chọn mô hình
-with st.sidebar:
-    st.title("📁 Tải lên tài liệu")
-    uploaded_file = st.file_uploader(
-        "Chọn file",
-        type=["pdf", "docx", "txt", "png", "jpg", "jpeg", "mp3", "wav"],
-        help="Tải lên các tài liệu để chatbot có thể học và trả lời câu hỏi của bạn."
+def setup_page():
+    st.set_page_config(
+        page_title="AI Assistant",
+        page_icon="💬",
+        layout="wide"
     )
+
+# === KHỞI TẠO ỨNG DỤNG ===
+
+
+def initialize_app():
+    load_dotenv()
+    setup_page()
+
+# === THANH CÔNG CỤ BÊN TRÁI ===
+
+
+def setup_sidebar():
+    with st.sidebar:
+        st.title("⚙️ Cấu hình")
+
+        st.header("📚 Nguồn dữ liệu")
+        data_source = st.radio("Chọn nguồn dữ liệu:", [
+                               "Câu hỏi", "Tải lên PDF"])
+
+        return data_source
+
+# === XỬ LÝ TẢI LÊN PDF ===
+
+
+def handle_pdf_upload():
+    uploaded_file = st.file_uploader("Chọn file PDF", type="pdf")
     if uploaded_file is not None:
-        with st.spinner('Đang xử lý...'):
-            files = {"file": (uploaded_file.name, uploaded_file.getvalue())}
-            response = requests.post(
-                "http://localhost:8000/upload_document", files=files)
-        if response.status_code == 200:
-            st.success("✅ Tải lên và xử lý file thành công!")
-            st.experimental_rerun()
-        else:
-            st.error("❌ Có lỗi xảy ra khi tải lên file.")
+        with st.spinner("Đang xử lý file PDF..."):
+            try:
+                pdf_reader = PyPDF2.PdfReader(uploaded_file)
+                text = ""
+                for page in pdf_reader.pages:
+                    text += page.extract_text()
+                st.success("Đã tải và xử lý file PDF thành công!")
+                return text
+            except Exception as e:
+                st.error(f"Lỗi khi xử lý file PDF: {str(e)}")
+    return None
 
-    st.title("⚙️ Cài đặt")
-    model = st.selectbox(
-        "Chọn mô hình",
-        ["gpt-3.5-turbo", "gpt-4"],
-        help="Chọn mô hình AI để sử dụng cho chatbot."
-    )
-
-# Tiêu đề chính của ứng dụng
-st.title("🤖 Chatbot Hỏi Đáp Nội Quy Trường Học")
-
-# Hàm hiển thị lịch sử chat
+# === GIAO DIỆN CHAT CHÍNH ===
 
 
-def display_chat_history():
-    for chat in st.session_state['chat_history']:
-        if chat['role'] == 'user':
-            message(chat['content'], is_user=True,
-                    key=str(uuid.uuid4()) + '_user')
-        else:
-            message(chat['content'], is_user=False,
-                    key=str(uuid.uuid4()) + '_bot')
+def setup_chat_interface():
+    st.title("💬 AI Assistant")
+    st.caption("🚀 Trợ lý AI được hỗ trợ bởi LangChain và OpenAI GPT-4")
 
-# Hàm gửi câu hỏi và nhận phản hồi từ API
+    if "messages" not in st.session_state:
+        st.session_state.messages = [
+            {"role": "assistant", "content": "Tôi có thể giúp gì cho bạn?"}]
 
+    for msg in st.session_state.messages:
+        role = "assistant" if msg["role"] == "assistant" else "human"
+        st.chat_message(role).write(msg["content"])
 
-async def stream_answer(question, session_id, model):
-    headers = {'accept': 'application/json',
-               'Content-Type': 'application/json'}
-    data = {"question": question, "model": model, "session_id": session_id}
-    try:
-        response = requests.post(
-            "http://localhost:8000/chat",
-            headers=headers,
-            json=data,
-            stream=True,
-            timeout=500
-        )
-        if response.status_code == 200:
-            content = ""
-            bot_message_placeholder = st.empty()
-            for chunk in response.iter_content(chunk_size=1024):
-                if chunk:
-                    text = chunk.decode()
-                    content += text
-                    bot_message_placeholder.markdown(f"**Trả lời:** {content}")
-            st.session_state['chat_history'].append(
-                {"role": "assistant", "content": content})
-            st.experimental_rerun()
-        else:
-            st.error(
-                f"API request failed with status code {response.status_code}: {response.text}")
-    except Exception as e:
-        st.error(f"An error occurred: {str(e)}")
-
-# Hiển thị lịch sử chat
-display_chat_history()
-
-# Hàm xử lý khi người dùng gửi câu hỏi
+# === XỬ LÝ TIN NHẮN NGƯỜI DÙNG ===
 
 
-def on_send():
-    question = st.session_state['input_question']
-    if question:
-        st.session_state['chat_history'].append(
-            {"role": "user", "content": question})
-        st.session_state['input_question'] = ""  # Xóa nội dung sau khi gửi
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(stream_answer(question, session_id, model))
-    else:
-        st.warning("⚠️ Vui lòng nhập câu hỏi.")
+def handle_user_input(data_source):
+    if data_source == "Câu hỏi":
+        prompt = st.chat_input("Hãy hỏi tôi bất cứ điều gì!")
+        if prompt:
+            st.session_state.messages.append(
+                {"role": "human", "content": prompt})
+            st.chat_message("human").write(prompt)
+
+            # Search using the text directly
+            results = search_milvus(prompt)
+
+            # Format results
+            formatted_results = []
+            for doc in results:
+                formatted_results.append({
+                    "content": doc.page_content,
+                    "source": doc.metadata.get("source", "Unknown"),
+                    "chunk_number": doc.metadata.get("chunk_number", "Unknown")
+                })
+
+            # Display results
+            response = "Kết quả tìm kiếm:\n\n"
+            for idx, result in enumerate(formatted_results, 1):
+                response += f"{idx}. Nguồn: {result['source']}\n"
+                response += f"   Đoạn số: {result['chunk_number']}\n"
+                response += f"   Nội dung: {result['content'][:200]}...\n\n"
+
+            st.session_state.messages.append(
+                {"role": "assistant", "content": response})
+            st.chat_message("assistant").write(response)
+    elif data_source == "Tải lên PDF":
+        pdf_text = handle_pdf_upload()
+        if pdf_text:
+            st.session_state.messages.append(
+                {"role": "human", "content": pdf_text})
+            st.chat_message("human").write(pdf_text)
+
+            # Search using the PDF text directly
+            results = search_milvus(pdf_text)
+
+            # Display results
+            response = f"Top results: {results}"
+            st.session_state.messages.append(
+                {"role": "assistant", "content": response})
+            st.chat_message("assistant").write(response)
+
+# === HÀM CHÍNH ===
 
 
-# Nhập câu hỏi với `on_change`
-st.text_input("Nhập câu hỏi của bạn", key="input_question", on_change=on_send)
+def main():
+    initialize_app()
+    data_source = setup_sidebar()
+    setup_chat_interface()
+    handle_user_input(data_source)
 
-# Nút xóa lịch sử chat
-if st.button("🧹 Xóa lịch sử chat"):
-    st.session_state['chat_history'] = []
-    st.experimental_rerun()
+
+# Chạy ứng dụng
+if __name__ == "__main__":
+    main()

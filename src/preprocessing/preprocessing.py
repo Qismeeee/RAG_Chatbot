@@ -5,7 +5,7 @@ import json
 import openai
 import hashlib
 from dotenv import load_dotenv
-from src.preprocessing.docsLoader import langchain_document_loader
+from preprocessing.docsLoader import langchain_document_loader
 from src.preprocessing.chunking import chunk_documents
 from src.preprocessing.embedding import process_embeddings
 from src.embeddings.faiss_index import FaissIndex

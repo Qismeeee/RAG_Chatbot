@@ -63,6 +63,7 @@ def process_embeddings(input_dir, output_file, processed_files_path):
             continue
         embedding = create_embedding(text)
         embeddings_data.append({
+            "id": metadata["doc_id"],  # Thêm id cho mỗi embedding
             "embedding": embedding,
             "metadata": metadata
         })
@@ -90,7 +91,7 @@ def process_embeddings(input_dir, output_file, processed_files_path):
 
 # Sử dụng
 if __name__ == "__main__":
-    input_directory = "data/chunks"
+    input_directory = "data/chunks/"
     output_file = "data/embeddings/embeddings.json"
     processed_files_json = "data/processed_files_embedding.json"
     process_embeddings(input_directory, output_file, processed_files_json)

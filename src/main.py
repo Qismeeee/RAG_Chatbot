@@ -1,11 +1,10 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from src.preprocessing.preprocessing import process_uploaded_file
-from src.database import init_db, insert_document_record, delete_document_record, get_all_documents
+from src.process_data import process_uploaded_file
+from src.database import delete_embedding, collection
 from src.chat_interface import generate_answer_stream
-from src.embeddings.faiss_index import FaissIndex
-
 import uvicorn
+import json
 
 app = FastAPI()
 
@@ -27,32 +26,24 @@ async def upload_document(file: UploadFile = File(...)):
     with open(file_location, "wb") as f:
         f.write(await file.read())
 
-    # Xử lý file và lấy document_id
-    document_id = process_uploaded_file(file_location)
+    # Xử lý file và lấy doc_ids
+    doc_ids = process_uploaded_file(file_location)
 
-    # Lưu thông tin tài liệu vào SQLite
-    insert_document_record(document_id, file.filename)
-
-    return {"message": "File uploaded successfully.", "document_id": document_id}
+    return {"message": "File uploaded successfully.", "doc_ids": doc_ids}
 
 
 @app.get("/list_documents")
 def list_documents():
-    documents = get_all_documents()
+    # Lấy tất cả document_id từ Milvus
+    all_entities = collection.query(expr="id != ''", output_fields=["id"])
+    documents = [entity["id"] for entity in all_entities]
     return {"documents": documents}
 
 
 @app.delete("/delete_document/{doc_id}")
 def delete_document(doc_id: str):
-    success = delete_document_record(doc_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Document not found.")
-
-    index = FaissIndex(dimension=384)
-    index.load_index("models/faiss_index")
-    index.remove_document_embeddings(doc_id)
-    index.save_index("models/faiss_index")
-
+    # Xóa document từ Milvus
+    delete_embedding(doc_id)
     return {"message": "Document deleted successfully."}
 
 
@@ -61,7 +52,7 @@ async def chat(request: Request):
     data = await request.json()
     question = data.get("question")
     session_id = data.get("session_id", None)
-    model_name = data.get("model", "gpt-4o-mini")
+    model_name = data.get("model", "gpt-3.5-turbo")
 
     if not question:
         raise HTTPException(status_code=400, detail="Question is required.")

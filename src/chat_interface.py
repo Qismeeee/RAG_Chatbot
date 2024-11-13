@@ -1,6 +1,8 @@
 import openai
 import os
 import json
+from src.database import search_embeddings, collection
+from sentence_transformers import SentenceTransformer
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
@@ -22,12 +24,31 @@ def save_conversation(session_id, conversation):
         json.dump(conversation, f, ensure_ascii=False, indent=4)
 
 
+def create_embedding(text):
+    model = SentenceTransformer('all-MiniLM-L6-v2')
+    embedding = model.encode(text)
+    return embedding.tolist()
+
+
 async def generate_answer_stream(question, session_id=None, model_name="gpt-3.5-turbo"):
     conversation = []
     if session_id:
         conversation = load_conversation(session_id)
 
-    conversation.append({"role": "user", "content": question})
+    # Tạo embedding cho câu hỏi
+    query_embedding = create_embedding(question)
+    # Tìm kiếm các embeddings tương tự từ Milvus
+    search_results = search_embeddings(query_embedding, top_k=5)
+    retrieved_texts = []
+    for result in search_results:
+        doc_id = result.id
+        retrieved_texts.append(f"Document ID: {doc_id}")
+
+    # Kết hợp các đoạn văn bản truy xuất được vào cuộc hội thoại
+    context = "\n".join(retrieved_texts)
+    conversation.append(
+        {"role": "user", "content": f"{question}\nContext:\n{context}"})
+
     response = openai.ChatCompletion.create(
         model=model_name,
         messages=conversation,
@@ -35,14 +56,16 @@ async def generate_answer_stream(question, session_id=None, model_name="gpt-3.5-
     )
 
     # Gửi phản hồi dạng streaming
+    assistant_reply = ""
     for chunk in response:
         if 'choices' in chunk:
             delta = chunk['choices'][0]['delta']
             if 'content' in delta:
                 text = delta['content']
+                assistant_reply += text
                 yield f"data: {text}\n\n"
 
     # Lưu lại lịch sử hội thoại
     if session_id:
-        conversation.append({"role": "assistant", "content": text})
+        conversation.append({"role": "assistant", "content": assistant_reply})
         save_conversation(session_id, conversation)

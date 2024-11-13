@@ -5,26 +5,26 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 
 def generate_doc_id(text, source, chunk_number):
-    """Generate a unique doc_id based on content, source, and chunk number."""
+    """Tạo một doc_id duy nhất dựa trên nội dung, nguồn và số thứ tự chunk."""
     unique_string = f"{text}_{source}_{chunk_number}"
     return hashlib.md5(unique_string.encode()).hexdigest()
 
 
 def load_text_content(file_path):
-    """Load text content from a .txt file."""
+    """Tải nội dung văn bản từ tệp .txt."""
     with open(file_path, 'r', encoding='utf-8') as f:
         return f.read()
 
 
 def load_json_content(file_path):
-    """Load content and metadata from a .json file."""
+    """Tải nội dung và metadata từ tệp .json."""
     with open(file_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
     return data["content"], data["metadata"]
 
 
 def chunk_text_with_splitter(text, chunk_size=512, chunk_overlap=50):
-    """Split text into chunks using RecursiveCharacterTextSplitter."""
+    """Chia văn bản thành các đoạn nhỏ bằng RecursiveCharacterTextSplitter."""
     text_splitter = RecursiveCharacterTextSplitter(
         separators=["\n\n", "\n", " ", ""],
         chunk_size=chunk_size,
@@ -68,7 +68,7 @@ def chunk_documents(input_dir, output_dir, processed_files_path, chunk_size=512,
             chunk_metadata.update({
                 "chunk_number": i,
                 "doc_id": generate_doc_id(chunk, filename, i),
-                "filename": filename  # Add filename to metadata
+                "filename": filename  # Thêm tên tệp vào metadata
             })
 
             output_data = {
