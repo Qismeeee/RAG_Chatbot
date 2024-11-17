@@ -9,31 +9,28 @@ from uuid import uuid4
 load_dotenv()
 
 
-def load_data_from_local(filename: str, directory: str) -> tuple:
+def load_data_from_local(filename: str, directory: str) -> list:
     file_path = os.path.join(directory, filename)
     with open(file_path, 'r', encoding='utf-8') as file:
         data = json.load(file)
     print(f'Data loaded from {file_path}')
-    return data, filename.rsplit('.', 1)[0].replace('_', ' ')
+    return data
 
 
-def seed_milvus(URI_link: str, collection_name: str, filename: str, directory: str, use_ollama: bool = False) -> Milvus:
+def seed_milvus(URI_link: str, collection_name: str, documents: list) -> Milvus:
     embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
 
-    local_data, doc_name = load_data_from_local(filename, directory)
-
+    # Convert documents to the required format
     documents = [
         Document(
             page_content=doc.get('page_content', ''),
             metadata={
                 'source': doc['metadata'].get('source', ''),
-                'chunk_number': doc['metadata'].get('chunk_number', 0),
-                'doc_id': doc['metadata'].get('doc_id', ''),
-                'filename': doc['metadata'].get('filename', ''),
-                'doc_name': doc_name
+                'title': doc['metadata'].get('title', ''),
+                'description': doc['metadata'].get('description', ''),
             }
         )
-        for doc in local_data
+        for doc in documents
     ]
 
     print('documents: ', documents)
@@ -52,8 +49,11 @@ def seed_milvus(URI_link: str, collection_name: str, filename: str, directory: s
 
 
 def main():
-    seed_milvus('http://localhost:19530', 'data_test',
-                'embeddings.json', 'data/embeddings', use_ollama=False)
+    # Load data from local JSON file
+    all_documents = load_data_from_local('ctu_data.json', 'data')
+
+    # Seed Milvus with the loaded documents
+    seed_milvus('http://localhost:19530', 'school_data', all_documents)
 
 
 if __name__ == "__main__":
