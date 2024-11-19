@@ -6,9 +6,9 @@ import openai
 import hashlib
 from dotenv import load_dotenv
 from preprocessing.docsLoader import langchain_document_loader
-from src.preprocessing.chunking import chunk_documents
-from src.preprocessing.embedding import process_embeddings
-from src.embeddings.faiss_index import FaissIndex
+from preprocessing.chunking import chunk_documents
+from preprocessing.embedding import process_embeddings
+from embeddings.faiss_index import FaissIndex
 
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -126,15 +126,16 @@ def process_uploaded_file(file_path):
         shutil.copy(file_path, temp_file_path)
 
         # Bước 1: Trích xuất văn bản từ file
-        langchain_document_loader(temp_dir)
+        # langchain_document_loader(temp_dir)
 
-        # Bước 2: Sửa lỗi chính tả và ngữ pháp
-        input_dir = "data/processed"
-        output_dir = "data/corrected"
-        correct_all_files(input_dir, output_dir)
+        # # Bước 2: Sửa lỗi chính tả và ngữ pháp
+        # input_dir = "data/processed"
+        # output_dir = "data/corrected"
+        # correct_all_files(input_dir, output_dir)
 
         # Bước 3: Chia nhỏ văn bản (chunking)
-        input_directory = output_dir
+        # input_directory = output_dir
+        input_directory = "data/processed"
         output_directory = "data/chunks"
         chunk_documents(input_directory, output_directory)
 

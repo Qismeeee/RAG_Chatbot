@@ -166,3 +166,6 @@ cython_debug/
 
 tests/
 models/
+data/
+src/data/
+key.json

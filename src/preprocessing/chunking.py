@@ -3,6 +3,8 @@ import json
 import hashlib
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
+from search_embeddings import seed_milvus
+
 
 def generate_doc_id(text, source, chunk_number):
     """Tạo một doc_id duy nhất dựa trên nội dung, nguồn và số thứ tự chunk."""
@@ -12,13 +14,13 @@ def generate_doc_id(text, source, chunk_number):
 
 def load_text_content(file_path):
     """Tải nội dung văn bản từ tệp .txt."""
-    with open(file_path, 'r', encoding='utf-8') as f:
+    with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
         return f.read()
 
 
 def load_json_content(file_path):
     """Tải nội dung và metadata từ tệp .json."""
-    with open(file_path, 'r', encoding='utf-8') as f:
+    with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
         data = json.load(f)
     return data["content"], data["metadata"]
 
@@ -36,7 +38,8 @@ def chunk_text_with_splitter(text, chunk_size=512, chunk_overlap=50):
 
 def chunk_documents(input_dir, output_dir, processed_files_path, chunk_size=512, chunk_overlap=50):
     os.makedirs(output_dir, exist_ok=True)
-    processed_files = load_processed_files(processed_files_path)
+    # processed_files = load_processed_files(processed_files_path)
+    processed_files = {}
 
     for filename in os.listdir(input_dir):
         file_path = os.path.join(input_dir, filename)
@@ -81,6 +84,8 @@ def chunk_documents(input_dir, output_dir, processed_files_path, chunk_size=512,
             with open(output_path, 'w', encoding='utf-8') as f:
                 json.dump(output_data, f, ensure_ascii=False, indent=4)
 
+            store = seed_milvus('http://localhost:19530', [output_data])
+            print("Saved data to milvus: ", store)
             print(f"Saved chunk {i} to {output_path}")
 
         # Cập nhật thông tin tệp đã xử lý
@@ -101,15 +106,17 @@ def compute_file_hash(file_path):
 
 
 def load_processed_files(processed_files_path):
+    print("Process files path", processed_files_path)
+    
     if os.path.exists(processed_files_path):
-        with open(processed_files_path, 'r') as f:
+        with open(processed_files_path, 'r', encoding='utf-8', errors='replace') as f:
             return json.load(f)
     else:
         return {}
 
 
 def save_processed_files(processed_files, processed_files_path):
-    with open(processed_files_path, 'w') as f:
+    with open(processed_files_path, 'w', encoding='utf-8') as f:
         json.dump(processed_files, f, indent=4)
 
 
