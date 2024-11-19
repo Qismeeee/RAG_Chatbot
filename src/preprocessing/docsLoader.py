@@ -13,8 +13,8 @@ from langchain_community.document_loaders import (
 )
 
 # Tesseract OCR and Google Cloud API Key
-pytesseract.pytesseract.tesseract_cmd = r"C:/Program Files/Tesseract-OCR/tesseract.exe"
-os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = "C:/Users/LOQ/AppData/Local/Google/Cloud SDK/key.json"
+pytesseract.pytesseract.tesseract_cmd = r'/usr/bin/tesseract'
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = "../key.json"
 
 
 def extract_text_from_image_google(image_path):
@@ -43,7 +43,7 @@ def save_text_to_json(text, metadata, output_path):
 
 def langchain_document_loader(TMP_DIR):
     documents = []
-    output_dir = "D:/HK1_2024-2025/Chatbot/Chat/data/processed"
+    output_dir = "data/processed"
     os.makedirs(output_dir, exist_ok=True)
 
     txt_loader = DirectoryLoader(
@@ -104,16 +104,16 @@ def langchain_document_loader(TMP_DIR):
 
     return documents
 
+if __name__ == "__main__":
+    TMP_DIR = "../data"
+    documents = langchain_document_loader(TMP_DIR)
 
-TMP_DIR = "D:/HK1_2024-2025/Chatbot/Chat/data/raw"
-documents = langchain_document_loader(TMP_DIR)
-
-for doc in documents:
-    if isinstance(doc, dict):
-        print("Nguồn:", doc['metadata']['source'])
-        print("Số trang:", doc['metadata'].get('page_number', 'N/A'))
-        print("Nội dung:\n", doc['page_content'])
-    else:
-        print("Nguồn:", doc.metadata.get('source', 'N/A'))
-        print("Nội dung:\n", doc.page_content)
-    print("-----\n")
+    for doc in documents:
+        if isinstance(doc, dict):
+            print("Nguồn:", doc['metadata']['source'])
+            print("Số trang:", doc['metadata'].get('page_number', 'N/A'))
+            print("Nội dung:\n", doc['page_content'])
+        else:
+            print("Nguồn:", doc.metadata.get('source', 'N/A'))
+            print("Nội dung:\n", doc.page_content)
+        print("-----\n")

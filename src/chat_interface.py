@@ -1,11 +1,12 @@
 import openai
+from openai import OpenAI
 import os
 import json
-from src.database import search_embeddings, collection
+from database import search_embeddings, collection
 from sentence_transformers import SentenceTransformer
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
-
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 def load_conversation(session_id):
     file_path = f"data/sessions/{session_id}.json"
@@ -49,7 +50,7 @@ async def generate_answer_stream(question, session_id=None, model_name="gpt-3.5-
     conversation.append(
         {"role": "user", "content": f"{question}\nContext:\n{context}"})
 
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model=model_name,
         messages=conversation,
         stream=True
@@ -69,3 +70,36 @@ async def generate_answer_stream(question, session_id=None, model_name="gpt-3.5-
     if session_id:
         conversation.append({"role": "assistant", "content": assistant_reply})
         save_conversation(session_id, conversation)
+
+
+def generate_answer(question, search_results, session_id=None, model_name="gpt-3.5-turbo"):
+    conversation = []
+    if session_id:
+        conversation = load_conversation(session_id)
+
+    # # Tạo embedding cho câu hỏi
+    # query_embedding = create_embedding(question)
+    # # Tìm kiếm các embeddings tương tự từ Milvus
+    # search_results = search_embeddings(query_embedding, top_k=5)
+    # retrieved_texts = []
+    # for result in search_results:
+    #     doc_id = result.id
+    #     retrieved_texts.append(f"Document ID: {doc_id}")
+
+    # Kết hợp các đoạn văn bản truy xuất được vào cuộc hội thoại
+    # context = "\n".join(retrieved_texts)
+    conversation.extend(
+        [{"role": "system", "content": f"Dựa vào kết quả truy vấn tài liệu dưới đây để trả lời câu hỏi của người dùng. \nThông tin tài liệu: {search_results}"},
+        {"role": "user", "content": f"Câu hỏi: {question}\n{search_results}"}])
+
+    response = client.chat.completions.create(
+        model=model_name,
+        messages=conversation
+    )
+    # Lưu lại lịch sử hội thoại
+    if session_id:
+        conversation.append({"role": "assistant", "content": response.choices[0].message.content.strip()})
+        save_conversation(session_id, conversation)
+    return response.choices[0].message.content.strip()
+
+    

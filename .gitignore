@@ -166,3 +166,4 @@ cython_debug/
 
 tests/
 models/
+volumes/etcd/member/wal/0.tmp

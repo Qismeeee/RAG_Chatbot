@@ -4,9 +4,11 @@ from dotenv import load_dotenv
 import PyPDF2
 import numpy as np
 # Import the search function
-from search_embeddings import search_milvus, connect_to_milvus
+from search_embeddings import search_milvus
 from langchain_openai import OpenAIEmbeddings
 
+from chat_interface import generate_answer, generate_answer_stream
+import asyncio 
 # === THIẾT LẬP GIAO DIỆN TRANG WEB ===
 
 
@@ -83,6 +85,8 @@ def handle_user_input(data_source):
 
             # Search using the text directly
             results = search_milvus(prompt)
+            print("PROMT: ", prompt)
+            # print("RESULTS: ", results)
 
             # Format results
             formatted_results = []
@@ -101,8 +105,31 @@ def handle_user_input(data_source):
                 response += f"   Nội dung: {result['content'][:200]}...\n\n"
 
             st.session_state.messages.append(
-                {"role": "assistant", "content": response})
+                    {"role": "assistant", "content": response})
             st.chat_message("assistant").write(response)
+            ai_response = generate_answer(prompt, result)
+            print("AI response: ", ai_response)
+            st.session_state.messages.append(
+                    {"role": "assistant", "content": ai_response})
+            st.chat_message("assistant").write(ai_response)
+            # ai_response = generate_answer_stream(prompt)
+            # print("AI response: ", ai_response)
+
+            # # Use asyncio to gather the results from the async generator
+            # async def gather_ai_response():
+            #     responses = []
+            #     async for res in ai_response:  # Use async for to iterate over the async generator
+            #         responses.append(res)
+            #     return responses
+
+            # # Run the async function and get the results
+            # results = asyncio.run(gather_ai_response())
+
+            # for res in results:
+            #     print("Response results: ", res)
+            #     st.session_state.messages.append(
+            #         {"role": "assistant", "content": res})
+            #     st.chat_message("assistant").write(res)
     elif data_source == "Tải lên PDF":
         pdf_text = handle_pdf_upload()
         if pdf_text:
@@ -132,3 +159,5 @@ def main():
 # Chạy ứng dụng
 if __name__ == "__main__":
     main()
+
+# streamlit run streamlit_app.py

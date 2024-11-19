@@ -1,8 +1,8 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from src.process_data import process_uploaded_file
-from src.database import delete_embedding, collection
-from src.chat_interface import generate_answer_stream
+from process_data import process_uploaded_file
+from database import delete_embedding, collection
+from chat_interface import generate_answer_stream
 import uvicorn
 import json
 
@@ -22,10 +22,10 @@ async def upload_document(file: UploadFile = File(...)):
     ]:
         raise HTTPException(status_code=400, detail="Unsupported file type.")
 
-    file_location = f"data/raw/{file.filename}"
-    with open(file_location, "wb") as f:
-        f.write(await file.read())
-
+    file_location = f"../data/{file.filename}"
+    # with open(file_location, "wb") as f:
+    #     f.write(await file.read())
+    print("File uploaded: ", file_location)
     # Xử lý file và lấy doc_ids
     doc_ids = process_uploaded_file(file_location)
 
@@ -63,4 +63,4 @@ async def chat(request: Request):
     )
 
 if __name__ == "__main__":
-    uvicorn.run("src.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

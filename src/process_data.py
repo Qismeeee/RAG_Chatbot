@@ -5,10 +5,10 @@ import json
 import openai
 import hashlib
 from dotenv import load_dotenv
-from src.preprocessing.docsLoader import langchain_document_loader
-from src.preprocessing.chunking import chunk_documents
+from preprocessing.docsLoader import langchain_document_loader
+from preprocessing.chunking import chunk_documents
 from sentence_transformers import SentenceTransformer
-from src.database import insert_embeddings, delete_embedding, collection
+from database import insert_embeddings, delete_embedding, collection
 
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -27,6 +27,7 @@ def compute_file_hash(file_path):
 
 def load_processed_files():
     """Tải danh sách các tệp đã xử lý từ tệp JSON."""
+    print("LOAD processed files: ")
     if os.path.exists(PROCESSED_FILES_PATH):
         with open(PROCESSED_FILES_PATH, 'r') as f:
             return json.load(f)
@@ -102,7 +103,8 @@ def correct_all_files(input_dir, output_dir):
 
 
 def process_uploaded_file(file_path):
-    processed_files = load_processed_files()
+    # processed_files = load_processed_files()
+    processed_files = {}
     file_hash = compute_file_hash(file_path)
     if file_hash in processed_files and processed_files[file_hash].get("chunked", False):
         print(f"Tệp {file_path} đã được chunking trước đó. Bỏ qua bước chunking.")
@@ -117,17 +119,18 @@ def process_uploaded_file(file_path):
         shutil.copy(file_path, temp_file_path)
 
         # Bước 1: Trích xuất văn bản từ tệp
-        langchain_document_loader(temp_dir)
+        # langchain_document_loader(temp_dir)
 
         # Bước 2: Sửa lỗi chính tả và ngữ pháp
-        input_dir = "data/processed"
-        output_dir_corrected = "data/corrected"
-        correct_all_files(input_dir, output_dir_corrected)
+        # input_dir = "data/processed"
+        # output_dir_corrected = "data/corrected"
+        # correct_all_files(input_dir, output_dir_corrected)
 
         # Bước 3: Chia nhỏ văn bản (chunking)
-        input_directory = output_dir_corrected
+        # input_directory = output_dir_corrected
+        input_directory = "data/processed"
         output_directory = "data/chunks"
-        chunk_documents(input_directory, output_directory)
+        chunk_documents(input_directory, output_directory, PROCESSED_FILES_PATH)
 
         # Đánh dấu chunking đã hoàn thành
         if file_hash not in processed_files:
@@ -160,7 +163,7 @@ def process_uploaded_file(file_path):
 
         doc_id = metadata.get("doc_id", str(uuid.uuid4()))
         metadata["doc_id"] = doc_id
-        insert_embeddings(doc_id, embedding)
+        # insert_embeddings(doc_id, embedding)
         print(f"Đã chèn embedding cho doc_id: {doc_id}")
 
         doc_ids.append(doc_id)
