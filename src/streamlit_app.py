@@ -108,10 +108,11 @@ def handle_user_input(data_source):
                     {"role": "assistant", "content": response})
             st.chat_message("assistant").write(response)
             ai_response = generate_answer(prompt, result)
-            print("AI response: ", ai_response)
+            # print("AI response: ", ai_response)
             st.session_state.messages.append(
                     {"role": "assistant", "content": ai_response})
-            st.chat_message("assistant").write(ai_response)
+            # st.chat_message("assistant").write(ai_response)
+            st.chat_message("assistant").write_stream(ai_response) #stream response
             # ai_response = generate_answer_stream(prompt)
             # print("AI response: ", ai_response)
 

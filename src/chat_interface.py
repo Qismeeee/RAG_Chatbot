@@ -72,34 +72,30 @@ async def generate_answer_stream(question, session_id=None, model_name="gpt-3.5-
         save_conversation(session_id, conversation)
 
 
-def generate_answer(question, search_results, session_id=None, model_name="gpt-3.5-turbo"):
+def generate_answer(question, search_results, stream = True,  session_id=None, model_name="gpt-3.5-turbo"):
     conversation = []
     if session_id:
         conversation = load_conversation(session_id)
 
-    # # Tạo embedding cho câu hỏi
-    # query_embedding = create_embedding(question)
-    # # Tìm kiếm các embeddings tương tự từ Milvus
-    # search_results = search_embeddings(query_embedding, top_k=5)
-    # retrieved_texts = []
-    # for result in search_results:
-    #     doc_id = result.id
-    #     retrieved_texts.append(f"Document ID: {doc_id}")
-
-    # Kết hợp các đoạn văn bản truy xuất được vào cuộc hội thoại
-    # context = "\n".join(retrieved_texts)
     conversation.extend(
         [{"role": "system", "content": f"Dựa vào kết quả truy vấn tài liệu dưới đây để trả lời câu hỏi của người dùng. \nThông tin tài liệu: {search_results}"},
         {"role": "user", "content": f"Câu hỏi: {question}\n{search_results}"}])
 
-    response = client.chat.completions.create(
-        model=model_name,
-        messages=conversation
-    )
+    if stream:
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=conversation,
+            stream=True,
+        )
+    else:    
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=conversation
+        ).choices[0].message.content.strip()
     # Lưu lại lịch sử hội thoại
     if session_id:
-        conversation.append({"role": "assistant", "content": response.choices[0].message.content.strip()})
+        conversation.append({"role": "assistant", "content": response})
         save_conversation(session_id, conversation)
-    return response.choices[0].message.content.strip()
+    return response
 
     
