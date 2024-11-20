@@ -6,6 +6,9 @@ from langchain.schema import Document
 from dotenv import load_dotenv
 from uuid import uuid4
 
+from preprocessing.chunking import chunk_documents
+from preprocessing.docsLoader import langchain_document_loader
+
 load_dotenv()
 
 
@@ -33,7 +36,7 @@ def seed_milvus(URI_link: str, collection_name: str, documents: list) -> Milvus:
         for doc in documents
     ]
 
-    print('documents: ', documents)
+    # print('documents: ', documents)
 
     uuids = [str(uuid4()) for _ in range(len(documents))]
 
@@ -47,14 +50,20 @@ def seed_milvus(URI_link: str, collection_name: str, documents: list) -> Milvus:
     print('vector: ', vectorstore)
     return vectorstore
 
-
+def prepare_milvus_data():
+    input_directory = "data/milvus_processed"
+    output_directory = "data/milvus_chunks"
+    langchain_document_loader("../data", input_directory)
+    chunk_documents(input_directory, output_directory, "data/new_milvus_processed_files.json")
 def main():
     # Load data from local JSON file
-    all_documents = load_data_from_local('ctu_data.json', 'data')
+    # all_documents = load_data_from_local('ctu_data.json', 'data')
+    all_documents = load_data_from_local('school_data.json', 'data')
 
     # Seed Milvus with the loaded documents
     seed_milvus('http://localhost:19530', 'school_data', all_documents)
 
 
 if __name__ == "__main__":
-    main()
+    # main()
+    prepare_milvus_data()

@@ -116,6 +116,12 @@ def crawl_web(url_data):
                 response.encoding = 'utf-8'
                 soup = BeautifulSoup(response.text, 'html.parser')
                 text = soup.get_text(separator='\n', strip=True)
+                if "pdf" in link:
+                    
+                    print("Sample text: ", text)
+                    print("Sample link: ", link)
+                    print("----------------")
+                    exit()
                 metadata = {'source': link,
                             'title': soup.title.string if soup.title else ''}
                 docs.append(Document(page_content=text, metadata=metadata))
@@ -172,13 +178,20 @@ def save_data_locally(documents, filename, directory):
 
     file_path = os.path.join(directory, filename)  # Tạo đường dẫn đầy đủ
 
+    for i, doc in enumerate(documents):
+        file = f"raw/{i}_{doc.metadata['title'].replace("/", "_")}"
+        data_save = {'page_content': doc.page_content,
+                     'metadata': doc.metadata}
+        with open(file, 'w', encoding='utf-8') as file:
+            json.dump(data_save, file, ensure_ascii=False, indent=4)
+        print(f'Data saved to {file_path}')
     # Chuyển đổi documents thành định dạng có thể serialize
-    data_to_save = [{'page_content': doc.page_content,
-                     'metadata': doc.metadata} for doc in documents]
-    # Lưu vào file JSON
-    with open(file_path, 'w') as file:
-        json.dump(data_to_save, file, indent=4)
-    print(f'Data saved to {file_path}')  # In thông báo lưu thành công
+    # data_to_save = [{'page_content': doc.page_content,
+    #                  'metadata': doc.metadata} for doc in documents]
+    # # Lưu vào file JSON
+    # with open(file_path, 'w', encoding='utf-8') as file:
+    #     json.dump(data_to_save, file, ensure_ascii=False, indent=4)
+    # print(f'Data saved to {file_path}')  # In thông báo lưu thành công
 
 
 def main():
@@ -199,7 +212,7 @@ def main():
 
     # Lưu dữ liệu vào thư mục data
     save_data_locally(data, 'school_data.json', 'data')
-    print('data: ', data)  # In dữ liệu đã crawl
+    # print('data: ', data)  # In dữ liệu đã crawl
 
 
 # Kiểm tra nếu file được chạy trực tiếp

@@ -36,7 +36,7 @@ def chunk_text_with_splitter(text, chunk_size=512, chunk_overlap=50):
     return text_splitter.split_text(text)
 
 
-def chunk_documents(input_dir, output_dir, processed_files_path, chunk_size=512, chunk_overlap=50):
+def chunk_documents(input_dir, output_dir, processed_files_path, chunk_size=4096, chunk_overlap=100):
     os.makedirs(output_dir, exist_ok=True)
     # processed_files = load_processed_files(processed_files_path)
     processed_files = {}
@@ -85,7 +85,7 @@ def chunk_documents(input_dir, output_dir, processed_files_path, chunk_size=512,
                 json.dump(output_data, f, ensure_ascii=False, indent=4)
 
             store = seed_milvus('http://localhost:19530', [output_data])
-            print("Saved data to milvus: ", store)
+            # print("Saved data to milvus: ", store)
             print(f"Saved chunk {i} to {output_path}")
 
         # Cập nhật thông tin tệp đã xử lý

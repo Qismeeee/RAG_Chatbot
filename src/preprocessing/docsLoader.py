@@ -41,9 +41,9 @@ def save_text_to_json(text, metadata, output_path):
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 
-def langchain_document_loader(TMP_DIR):
+def langchain_document_loader(TMP_DIR, output_dir):
     documents = []
-    output_dir = "data/processed"
+    # output_dir = "data/processed"
     os.makedirs(output_dir, exist_ok=True)
 
     txt_loader = DirectoryLoader(
