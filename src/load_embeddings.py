@@ -53,7 +53,7 @@ def main():
     all_documents = load_data_from_local('ctu_data.json', 'data')
 
     # Seed Milvus with the loaded documents
-    seed_milvus('http://localhost:19530', 'school_data', all_documents)
+    seed_milvus('http://localhost:19530', 'chatbot_collection', all_documents)
 
 
 if __name__ == "__main__":

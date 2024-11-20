@@ -18,3 +18,4 @@ streamlit-chat
 python-docx
 requests
 tqdm
+pymilvus

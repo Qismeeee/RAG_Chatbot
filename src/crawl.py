@@ -137,8 +137,12 @@ def crawl_web(url_data):
 def crawl_multiple_urls(urls):
     """Crawl multiple URLs and download files if applicable."""
     all_documents = []
-    download_dir = 'data/downloads'
+    download_dir = 'data/download'
     downloaded_files = set()  # Set to track downloaded files
+
+    # Tạo thư mục download nếu chưa tồn tại
+    if not os.path.exists(download_dir):
+        os.makedirs(download_dir)
 
     for url in urls:
         print(f"Crawling URL: {url}")
@@ -189,16 +193,17 @@ def main():
     3. In kết quả crawl để kiểm tra
     """
     urls = [
-        'https://tuyensinh.ctu.edu.vn/',
-        'https://tansinhvien.ctu.edu.vn/',
-        'https://dsa.ctu.edu.vn/noi-quy-quy-che.html',
+        'https://scs.ctu.edu.vn/',
     ]
 
     # Crawl dữ liệu từ nhiều URL
     data = crawl_multiple_urls(urls)
 
     # Lưu dữ liệu vào thư mục data
-    save_data_locally(data, 'school_data.json', 'data')
+    try:
+        save_data_locally(data, 'school_data.json', 'data')
+    except Exception as e:
+        print(f"Error saving data: {e}")
     print('data: ', data)  # In dữ liệu đã crawl
 
 
