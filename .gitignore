@@ -170,3 +170,4 @@ volumes/etcd/member/wal/0.tmp
 data/
 src/data/
 key.json
+volumes
