@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from process_data import process_uploaded_file
@@ -5,6 +6,10 @@ from database import delete_embedding, collection
 from chat_interface import generate_answer_stream
 import uvicorn
 import json
+import tempfile
+import shutil
+
+from preprocessing.docsLoader import langchain_document_loader, load_document
 
 app = FastAPI()
 
@@ -22,10 +27,18 @@ async def upload_document(file: UploadFile = File(...)):
     ]:
         raise HTTPException(status_code=400, detail="Unsupported file type.")
 
-    file_location = f"../data/{file.filename}"
-    # with open(file_location, "wb") as f:
-    #     f.write(await file.read())
+    temp_dir = "data/temp_files"
+    if not os.path.exists(temp_dir):
+        os.makedirs(temp_dir, exist_ok=True)
+    
+    file_location = f"{temp_dir}/{file.filename}"
+    
+    # Save the uploaded file to the temporary directory
+    with open(file_location, "wb") as f:
+        f.write(await file.read())
+
     print("File uploaded: ", file_location)
+    
     # Xử lý file và lấy doc_ids
     doc_ids = process_uploaded_file(file_location)
 

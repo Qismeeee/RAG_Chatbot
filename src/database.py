@@ -70,29 +70,3 @@ def search_embeddings(query_embedding, top_k=5):
     )
     return results[0]
 
-client = MilvusClient(
-    uri="http://localhost:19530"
-)
-res = client.list_collections()
-res = client.describe_collection(
-    collection_name="langchain_milvus"
-)
-# res = client.get_load_state(
-#     collection_name=COLLECTION_NAME
-# )
-# res = client.get(
-#     collection_name=COLLECTION_NAME,
-#     ids=["7c6a663592f3d8434cd1f848dc45a9c6"]
-# )
-print(res)
-
-# collection = init_milvus()
-# print(collection.schema)                # Return the schema.CollectionSchema of the collection.
-# collection.description           # Return the description of the collection.
-# print("Name: ", collection.name)                  # Return the name of the collection.
-# print("Is empty: ", collection.is_empty)              # Return the boolean value that indicates if the collection is empty.
-# collection.num_entities          # Return the number of entities in the collection.
-# collection.primary_field         # Return the schema.FieldSchema of the primary key field.
-# collection.partitions            # Return the list[Partition] object.
-# print(collection.indexes)
-# print(res)

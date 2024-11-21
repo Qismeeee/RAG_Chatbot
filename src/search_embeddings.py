@@ -48,14 +48,4 @@ def load_data(URI_link, collection_name: str = "langchain_milvus"):
         collection_name=collection_name,
     )
     return vector_store_loaded
-def main():
-    # Example query
-    # query_text = "Example query"
-    # results = search_milvus(query_text)
-    # print(f"Top results: {results}")
-    data = load_data('http://localhost:19530')
-    print("Check data from milvus: ", data)
 
-
-if __name__ == "__main__":
-    main()

@@ -29,7 +29,14 @@ def create_embedding(text):
     model = SentenceTransformer('all-MiniLM-L6-v2')
     embedding = model.encode(text)
     return embedding.tolist()
-
+def speech_to_text(audio_data):
+    with open(audio_data, "rb") as audio_file:
+        transcript = client.audio.transcriptions.create(
+            model="whisper-1",
+            response_format="text",
+            file=audio_file
+        )
+    return transcript
 
 async def generate_answer_stream(question, session_id=None, model_name="gpt-3.5-turbo"):
     conversation = []

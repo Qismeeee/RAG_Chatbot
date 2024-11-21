@@ -40,7 +40,56 @@ def save_text_to_json(text, metadata, output_path):
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
+def load_document(file, output_dir):
+    assert(file.endswith(".pdf"), "Now only accept pdf file!")
+    documents = []
+    # output_dir = "data/processed"
+    os.makedirs(output_dir, exist_ok=True)
 
+    if file.endswith(".pdf"):
+        base_filename = os.path.splitext(os.path.basename(file))[0]
+        try:
+            pdf_loader = PyPDFLoader(file)
+            pdf_documents = pdf_loader.load()
+            if pdf_documents and any(doc.page_content for doc in pdf_documents):
+                documents.extend(pdf_documents)
+                print(f"Đã xử lý PDF thường: {os.path.basename(file)}")
+                for i, doc in enumerate(pdf_documents, start=1):
+                    output_path = os.path.join(
+                        output_dir, f"{base_filename}_page_{i}.txt")
+                    save_text_to_txt(doc.page_content, output_path)
+            else:
+                raise ValueError("PDF có thể là dạng scan")
+        except Exception:
+            print(
+                f"Đã phát hiện PDF dạng scan, sử dụng OCR: {os.path.basename(file)}")
+            pages = convert_from_path(file)
+            for page_number, page in enumerate(pages, start=1):
+                temp_image_path = f"temp_page_{page_number}.png"
+                page.save(temp_image_path, "PNG")
+
+                try:
+                    text = extract_text_from_image_google(temp_image_path)
+                    if not text:
+                        text = extract_text_from_image_tesseract(page)
+                except Exception as e:
+                    print(f"Lỗi với Google OCR, chuyển sang Tesseract: {e}")
+                    text = extract_text_from_image_tesseract(page)
+
+                metadata = {"source": os.path.basename(
+                    file), "page_number": page_number}
+                documents.append({
+                    "page_content": text,
+                    "metadata": metadata
+                })
+
+                output_path_json = os.path.join(
+                    output_dir, f"{base_filename}_page_{page_number}.json")
+                save_text_to_json(text, metadata, output_path_json)
+
+                os.remove(temp_image_path)
+
+    return documents
 def langchain_document_loader(TMP_DIR, output_dir):
     documents = []
     # output_dir = "data/processed"
