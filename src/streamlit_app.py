@@ -10,7 +10,9 @@ from search_embeddings import search_milvus
 from langchain_openai import OpenAIEmbeddings
 
 from chat_interface import generate_answer, generate_answer_stream, speech_to_text
-import asyncio 
+import asyncio
+
+from process_data import handle_upload_file 
 # === THIẾT LẬP GIAO DIỆN TRANG WEB ===
 
 def setup_page():
@@ -35,27 +37,27 @@ def setup_sidebar():
         st.title("⚙️ Cấu hình")
 
         st.header("📚 Nguồn dữ liệu")
-        data_source = st.radio("Chọn nguồn dữ liệu:", [
-                               "Câu hỏi", "Tải lên PDF"])
+        # data_source = st.radio("Chọn nguồn dữ liệu:", [
+        #                        "Câu hỏi", "Tải lên PDF"])
+        pdf_text = handle_pdf_upload()
 
-        return data_source
+        return None
 
 # === XỬ LÝ TẢI LÊN PDF ===
 
 
 def handle_pdf_upload():
-    uploaded_file = st.file_uploader("Chọn file PDF", type="pdf")
-    if uploaded_file is not None:
+    files = st.file_uploader("Tải lên PDF", type="pdf", accept_multiple_files=True)
+    print("Uploaded_file: ", files)
+    for uploaded_file in files:
         with st.spinner("Đang xử lý file PDF..."):
-            try:
-                pdf_reader = PyPDF2.PdfReader(uploaded_file)
-                text = ""
-                for page in pdf_reader.pages:
-                    text += page.extract_text()
-                st.success("Đã tải và xử lý file PDF thành công!")
-                return text
+            try: 
+                handle_upload_file(uploaded_file)
+                st.toast(f"Đã tải và xử lý file {uploaded_file.name} thành công!", icon="✅")
             except Exception as e:
-                st.error(f"Lỗi khi xử lý file PDF: {str(e)}")
+                st.toast(f"Lỗi khi xử lý file PDF: {str(e)}")
+    
+
     return None
 
 # === GIAO DIỆN CHAT CHÍNH ===
@@ -71,8 +73,8 @@ def setup_chat_interface():
 
 
 
-def handle_user_input(data_source):
-    if data_source == "Câu hỏi":
+def handle_user_input():
+    # if data_source == "Câu hỏi":
         for msg in st.session_state.messages:
             role = "assistant" if msg["role"] == "assistant" else "human"
             st.chat_message(role).write(msg["content"])
@@ -93,12 +95,13 @@ def handle_user_input(data_source):
                 with open(webm_file_path, "wb") as f:
                     f.write(audio_bytes)
 
-                transcript = speech_to_text(webm_file_path)
-                if transcript:
-                    st.session_state.messages.append({"role": "user", "content": transcript})
-                    with st.chat_message("user"):
-                        st.write(transcript)
-                    os.remove(webm_file_path)
+                prompt = speech_to_text(webm_file_path)
+                os.remove(webm_file_path)
+                # if transcript:
+                #     st.session_state.messages.append({"role": "user", "content": transcript})
+                #     with st.chat_message("user"):
+                #         st.write(transcript)
+                #     os.remove(webm_file_path)
         if prompt:
             st.session_state.messages.append(
                 {"role": "human", "content": prompt})
@@ -134,22 +137,7 @@ def handle_user_input(data_source):
                     {"role": "assistant", "content": ai_response})
             # st.chat_message("assistant").write(ai_response)
             st.chat_message("assistant").write_stream(ai_response) #stream response
-            
-    elif data_source == "Tải lên PDF":
-        pdf_text = handle_pdf_upload()
-        if pdf_text:
-            st.session_state.messages.append(
-                {"role": "human", "content": pdf_text})
-            st.chat_message("human").write(pdf_text)
-
-            # Search using the PDF text directly
-            results = search_milvus(pdf_text)
-
-            # Display results
-            response = f"Top results: {results}"
-            st.session_state.messages.append(
-                {"role": "assistant", "content": response})
-            st.chat_message("assistant").write(response)
+    
 # === HÀM CHÍNH ===
 
 
@@ -157,7 +145,7 @@ def main():
     initialize_app()
     data_source = setup_sidebar()
     setup_chat_interface()
-    handle_user_input(data_source)
+    handle_user_input()
 
 
 # Chạy ứng dụng

@@ -99,7 +99,21 @@ def correct_all_files(input_dir, output_dir):
         if filename.endswith(".txt") or filename.endswith(".json"):
             process_file(file_path, output_dir)
 
+def handle_upload_file(file):
+    temp_dir = "data/temp_files"
+    if not os.path.exists(temp_dir):
+        os.makedirs(temp_dir, exist_ok=True)
+    
+    file_location = f"{temp_dir}/{file.name}"
+    
+    # Save the uploaded file to the temporary directory
+    with open(file_location, "wb") as f:
+        f.write(file.read())
 
+    print("File uploaded: ", file_location)
+    
+    # Xử lý file và lấy doc_ids
+    process_uploaded_file(file_location)
 def process_uploaded_file(file_path):
     processed_files = load_processed_files()
     # processed_files = {}
