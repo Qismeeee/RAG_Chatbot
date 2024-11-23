@@ -77,7 +77,7 @@ async def generate_answer_stream(question, session_id=None, model_name="gpt-3.5-
         save_conversation(session_id, conversation)
 
 
-def generate_answer(question, search_results, stream=True,  session_id=None, model_name="gpt-3.5-turbo"):
+def generate_answer(question, search_results, stream=True,  session_id=None, model_name="gpt-4o"):
     conversation = []
     if session_id:
         conversation = load_conversation(session_id)

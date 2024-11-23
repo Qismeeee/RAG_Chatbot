@@ -4,7 +4,7 @@ import json
 import requests
 from urllib3.util.retry import Retry
 from requests.adapters import HTTPAdapter
-from langchain_community.document_loaders import RecursiveUrlLoader, WebBaseLoader
+from langchain_community.document_loaders import RecursiveUrlLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
@@ -57,50 +57,19 @@ def download_file(url: str, download_dir: str, session: requests.Session):
 
 def crawl_web(url_data):
     try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
+        loader = RecursiveUrlLoader(
+            urls=[url_data],
+            max_depth=4, 
+            headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+        )
+        docs = loader.load()
 
-        session = requests.Session()
-        session.verify = False
-        session.headers.update(headers)
-        retries = Retry(total=5, backoff_factor=0.1)
-        session.mount('https://', HTTPAdapter(max_retries=retries))
-        response = session.get(url_data, timeout=30)
-        response.encoding = 'utf-8'
-        soup = BeautifulSoup(response.text, 'html.parser')
-
-        text_content = soup.get_text(separator='\n', strip=True)
-        metadata = {'source': url_data,
-                    'title': soup.title.string if soup.title else ''}
-        doc = Document(page_content=text_content, metadata=metadata)
-        docs = [doc]
-
-        links = set()
-        for a in soup.find_all('a', href=True):
-            link = a['href']
-            if link.startswith('/'):
-                link = urljoin(url_data, link)
-            if link.startswith('http') and 'ctu.edu.vn' in link:
-                links.add(link)
-
-        for link in list(links)[:10]:
-            try:
-                response = session.get(link, timeout=10)
-                response.encoding = 'utf-8'
-                soup = BeautifulSoup(response.text, 'html.parser')
-                text = soup.get_text(separator='\n', strip=True)
-                if "pdf" in link:
-
-                    print("Sample text: ", text)
-                    print("Sample link: ", link)
-                    print("----------------")
-                    exit()
-                metadata = {'source': link,
-                            'title': soup.title.string if soup.title else ''}
-                docs.append(Document(page_content=text, metadata=metadata))
-            except Exception as e:
-                continue
+        for doc in docs:
+            if is_downloadable_file(doc.metadata.get('source', '')):
+                download_file(doc.metadata['source'],
+                              'data/downloads', create_session())
 
         print(f'Documents loaded from {url_data}: {len(docs)}')
 
@@ -119,7 +88,7 @@ def crawl_multiple_urls(urls):
     download_dir = 'data/downloads'
     downloaded_files = set()
     for url in urls:
-        print(f"Crawling URL: {url}")
+        print(f"Crawling URL with RecursiveUrlLoader: {url}")
         docs = crawl_web(url)
         all_documents.extend(docs)
 

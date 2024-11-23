@@ -1,209 +1,253 @@
-# === IMPORT CÁC THƯ VIỆN CẦN THIẾT ===
-import os
 import streamlit as st
-from audio_recorder_streamlit import audio_recorder
 from dotenv import load_dotenv
-import PyPDF2
-import numpy as np
-# Import the search function
+from local_ollama import get_retriever as get_ollama_retriever, get_llm_and_agent as get_ollama_agent
+from langchain_community.callbacks.streamlit import StreamlitCallbackHandler
+from langchain_community.chat_message_histories import StreamlitChatMessageHistory
+from crawl import crawl_multiple_urls
+from local_ollama import get_retriever as get_ollama_retriever, get_llm_and_agent as get_ollama_agent
 from search_embeddings import search_milvus
-from langchain_openai import OpenAIEmbeddings
-
-from chat_interface import generate_answer, generate_answer_stream, speech_to_text
-import asyncio
-# === THIẾT LẬP GIAO DIỆN TRANG WEB ===
+import PyPDF2
+import os
+from audio_recorder_streamlit import audio_recorder
 
 
 def setup_page():
     st.set_page_config(
-        page_title="AI Assistant",
-        page_icon="💬",
+        page_title="CTU Chatbot Assistant",
+        page_icon="🎓",
         layout="wide"
     )
-
-# === KHỞI TẠO ỨNG DỤNG ===
 
 
 def initialize_app():
     load_dotenv()
     setup_page()
 
-# === THANH CÔNG CỤ BÊN TRÁI ===
 
-
-def display_sidebar():
-    st.sidebar.title("⚙️ Cấu hình")
-
-    # Embedding Model Selection
-    st.sidebar.subheader("📚 Embeddings Model")
-    embedding_model = st.sidebar.radio(
-        "Chọn Embeddings Model:",
-        options=["OpenAI", "Ollama"],
-        index=1
+def setup_header():
+    st.image("../images/logoCTU.png", width=150)
+    st.markdown(
+        """
+        <div style="text-align: center; margin-top: -10px; font-size: 18px; color: black; background-color: #FFFF00; padding: 10px; border-radius: 10px;">
+            <b>Đồng thuận – Tận tâm – Chuẩn mực – Sáng tạo</b>
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
-    # Data Source Configuration
-    st.sidebar.subheader("📚 Nguồn dữ liệu")
-    data_source = st.sidebar.radio(
-        "Chọn nguồn dữ liệu:",
-        options=["File Local", "URL trực tiếp"],
-        index=0
-    )
 
-    # Input fields based on the selected data source
-    if data_source == "File Local":
-        uploaded_file = st.sidebar.file_uploader(
-            "Chọn file:", type=["pdf", "docx", "html"])
-        if uploaded_file and st.sidebar.button("Crawl dữ liệu"):
-            with st.spinner("Đang tải lên..."):
-                upload_response = add_embedding(
-                    file_id="example_id",  # Replace with actual data
-                    filename=uploaded_file.name,
-                    source="uploaded",
-                    chunk_number=1,
-                    doc_id="example_doc_id",
-                    embedding=uploaded_file.read()
+def setup_sidebar():
+    with st.sidebar:
+        setup_header()
+        st.title("⚙️ Cấu hình CTU Chatbot Assistant")
+
+        st.header("🔤 Embeddings Model")
+        embeddings_choice = st.radio(
+            "Chọn Embeddings Model:",
+            ["OpenAI", "Ollama"]
+        )
+        use_ollama_embeddings = (embeddings_choice == "Ollama")
+
+        st.header("📚 Nguồn dữ liệu")
+        data_source = st.radio(
+            "Chọn nguồn dữ liệu:",
+            ["File Local", "URL trực tiếp"]
+        )
+
+        if data_source == "File Local":
+            handle_local_file(use_ollama_embeddings)
+        else:
+            handle_url_input(use_ollama_embeddings)
+
+        st.header("🔍 Collection để truy vấn")
+        collection_to_query = st.text_input(
+            "Nhập tên collection cần truy vấn:",
+            "data_test",
+            help="Nhập tên collection bạn muốn sử dụng để tìm kiếm thông tin"
+        )
+
+        st.header("🤖 Model AI")
+        model_choice = st.radio(
+            "Chọn AI Model để trả lời:",
+            ["OpenAI GPT-4o", "Ollama (Local)"]
+        )
+
+        st.header("🌐 Nhập URL để crawl")
+        url_to_crawl = st.text_input(
+            "Nhập URL muốn crawl:", "https://www.ctu.edu.vn")
+
+        if st.button("Crawl dữ liệu từ URL"):
+            if not url_to_crawl:
+                st.error("Vui lòng nhập URL!")
+            else:
+                docs = crawl_multiple_urls([url_to_crawl])
+                st.success(f"Đã crawl dữ liệu từ URL '{url_to_crawl}'!")
+
+        return model_choice, collection_to_query
+
+
+def handle_local_file(use_ollama_embeddings: bool):
+    collection_name = st.text_input(
+        "Tên collection trong Milvus:",
+        "data_test",
+        help="Nhập tên collection bạn muốn lưu trong Milvus"
+    )
+    filename = st.text_input("Tên file JSON:", "ctu_data.json")
+    directory = st.text_input("Thư mục chứa file:", "data")
+
+    if st.button("Tải dữ liệu từ file"):
+        if not collection_name:
+            st.error("Vui lòng nhập tên collection!")
+            return
+
+        with st.spinner("Đang tải dữ liệu..."):
+            try:
+                seed_milvus(
+                    'http://localhost:19530',
+                    collection_name,
+                    filename,
+                    directory,
+                    use_ollama=use_ollama_embeddings
                 )
-                if upload_response:
-                    st.sidebar.success("Dữ liệu đã được tải lên.")
-                    st.session_state.documents = get_all_embeddings()
-    else:
-        url = st.sidebar.text_input("Nhập URL:")
-        collection_name = st.sidebar.text_input("Tên collection trong Milvus:")
-        if url and collection_name and st.sidebar.button("Crawl dữ liệu"):
-            st.sidebar.success(f"Dữ liệu từ URL: {url} đã được xử lý.")
+                st.success(
+                    f"Đã tải dữ liệu thành công vào collection '{collection_name}'!")
+            except Exception as e:
+                st.error(f"Lỗi khi tải dữ liệu: {str(e)}")
 
-    # AI Model Selection
-    st.sidebar.subheader("🤖 Model AI")
-    ai_model = st.sidebar.radio(
-        "Chọn AI Model để trả lời:",
-        options=["OpenAI GPT", "Ollama (Local)"],
-        index=1
+
+def handle_url_input(use_ollama_embeddings: bool):
+    collection_name = st.text_input(
+        "Tên collection trong Milvus:",
+        "data_test_live",
+        help="Nhập tên collection bạn muốn lưu trong Milvus"
     )
+    url = st.text_input("Nhập URL:", "https://www.ctu.edu.vn")
 
-# === XỬ LÝ TẢI LÊN PDF ===
+    if st.button("Crawl dữ liệu"):
+        if not collection_name:
+            st.error("Vui lòng nhập tên collection!")
+            return
+
+        with st.spinner("Đang crawl dữ liệu..."):
+            try:
+                seed_milvus_live(
+                    url,
+                    'http://localhost:19530',
+                    collection_name,
+                    'ctu_data',
+                    use_ollama=use_ollama_embeddings
+                )
+                st.success(
+                    f"Đã crawl dữ liệu thành công vào collection '{collection_name}'!")
+            except Exception as e:
+                st.error(f"Lỗi khi crawl dữ liệu: {str(e)}")
 
 
 def handle_pdf_upload():
-    uploaded_file = st.file_uploader("Chọn file PDF", type="pdf")
-    if uploaded_file is not None:
+    files = st.file_uploader("Tải lên PDF", type="pdf",
+                             accept_multiple_files=True)
+    print("Uploaded_file: ", files)
+    for uploaded_file in files:
         with st.spinner("Đang xử lý file PDF..."):
             try:
-                pdf_reader = PyPDF2.PdfReader(uploaded_file)
-                text = ""
-                for page in pdf_reader.pages:
-                    text += page.extract_text()
-                st.success("Đã tải và xử lý file PDF thành công!")
-                return text
+                handle_upload_file(uploaded_file)
+                st.toast(
+                    f"Đã tải và xử lý file {uploaded_file.name} thành công!", icon="✅")
             except Exception as e:
-                st.error(f"Lỗi khi xử lý file PDF: {str(e)}")
+                st.toast(f"Lỗi khi xử lý file PDF: {str(e)}")
+
     return None
 
-# === GIAO DIỆN CHAT CHÍNH ===
 
-
-def setup_chat_interface():
-    st.title("💬 AI Assistant")
-    st.caption("🚀 Trợ lý AI được hỗ trợ bởi LangChain và OpenAI GPT-4")
+def setup_chat_interface(model_choice):
+    st.title("💬 CTU Chatbot Assistant")
+    if model_choice == "OpenAI GPT-4o":
+        st.caption("🚀 Trợ lý AI được hỗ trợ bởi LangChain và OpenAI GPT-4o")
+    else:
+        st.caption("🚀 Trợ lý AI được hỗ trợ bởi LangChain và Ollama LLaMA2")
+    msgs = StreamlitChatMessageHistory(key="langchain_messages")
 
     if "messages" not in st.session_state:
         st.session_state.messages = [
-            {"role": "assistant", "content": "Tôi có thể giúp gì cho bạn?"}]
+            {"role": "assistant",
+                "content": "Chào mừng bạn đến với CTU Chabot Assistant! Tôi có thể hỗ trợ gì cho bạn?"}
+        ]
+        msgs.add_ai_message(
+            "Chào mừng bạn đến với CTU Chabot Assistant! Tôi có thể hỗ trợ gì cho bạn?")
+
+    for msg in st.session_state.messages:
+        role = "assistant" if msg["role"] == "assistant" else "human"
+        st.chat_message(role).write(msg["content"])
+
+    return msgs
 
 
-def handle_user_input(data_source):
-    if data_source == "Câu hỏi":
-        for msg in st.session_state.messages:
-            role = "assistant" if msg["role"] == "assistant" else "human"
-            st.chat_message(role).write(msg["content"])
-        # Create footer container for the microphone
-        # footer_container = st.container()
-        # with footer_container:
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            prompt = st.chat_input("Hãy hỏi tôi bất cứ điều gì!")
-        with col2:
-            audio_bytes = audio_recorder(text="", icon_size="2x")
-            print("AUDIO: ", audio_bytes)
+def handle_user_input():
+    for msg in st.session_state.messages:
+        role = "assistant" if msg["role"] == "assistant" else "human"
+        st.chat_message(role).write(msg["content"])
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        prompt = st.chat_input("Hãy hỏi tôi bất cứ điều gì!")
+    with col2:
+        audio_bytes = audio_recorder(text="", icon_size="2x")
+        print("AUDIO: ", audio_bytes)
 
-        if audio_bytes:
-            # Write the audio bytes to a file
-            with st.spinner("Transcribing..."):
-                webm_file_path = "temp_audio.mp3"
-                with open(webm_file_path, "wb") as f:
-                    f.write(audio_bytes)
+    if audio_bytes:
+        with st.spinner("Transcribing..."):
+            webm_file_path = "temp_audio.mp3"
+            with open(webm_file_path, "wb") as f:
+                f.write(audio_bytes)
 
-                transcript = speech_to_text(webm_file_path)
-                if transcript:
-                    st.session_state.messages.append(
-                        {"role": "user", "content": transcript})
-                    with st.chat_message("user"):
-                        st.write(transcript)
-                    os.remove(webm_file_path)
-        if prompt:
-            st.session_state.messages.append(
-                {"role": "human", "content": prompt})
-            st.chat_message("human").write(prompt)
+            prompt = speech_to_text(webm_file_path)
+            os.remove(webm_file_path)
+            # if transcript:
+            #     st.session_state.messages.append({"role": "user", "content": transcript})
+            #     with st.chat_message("user"):
+            #         st.write(transcript)
+            #     os.remove(webm_file_path)
+    if prompt:
+        st.session_state.messages.append(
+            {"role": "human", "content": prompt})
+        st.chat_message("human").write(prompt)
 
-            # Search using the text directly
-            results = search_milvus(prompt)
-            print("PROMT: ", prompt)
-            # print("RESULTS: ", results)
+        results = search_milvus(prompt)
+        print("PROMT: ", prompt)
+        # print("RESULTS: ", results)
 
-            # Format results
-            formatted_results = []
-            for doc in results:
-                formatted_results.append({
-                    "content": doc.page_content,
-                    "source": doc.metadata.get("source", "Unknown"),
-                    "chunk_number": doc.metadata.get("chunk_number", "Unknown")
-                })
+        formatted_results = []
+        for doc in results:
+            formatted_results.append({
+                "content": doc.page_content,
+                "source": doc.metadata.get("source", "Unknown"),
+                "chunk_number": doc.metadata.get("chunk_number", "Unknown")
+            })
 
-            # Display results
-            response = "Kết quả tìm kiếm:\n\n"
-            for idx, result in enumerate(formatted_results, 1):
-                response += f"{idx}. Nguồn: {result['source']}\n"
-                response += f"   Đoạn số: {result['chunk_number']}\n"
-                response += f"   Nội dung: {result['content'][:200]}...\n\n"
+        # Display results
+        response = "Kết quả tìm kiếm:\n\n"
+        for idx, result in enumerate(formatted_results, 1):
+            response += f"{idx}. Nguồn: {result['source']}\n"
+            response += f"   Đoạn số: {result['chunk_number']}\n"
+            response += f"   Nội dung: {result['content'][:200]}...\n\n"
 
-            st.session_state.messages.append(
-                {"role": "assistant", "content": response})
-            st.chat_message("assistant").write(response)
-            ai_response = generate_answer(prompt, result)
-            # print("AI response: ", ai_response)
-            st.session_state.messages.append(
-                {"role": "assistant", "content": ai_response})
-            # st.chat_message("assistant").write(ai_response)
-            st.chat_message("assistant").write_stream(
-                ai_response)  # stream response
-
-    elif data_source == "Tải lên PDF":
-        pdf_text = handle_pdf_upload()
-        if pdf_text:
-            st.session_state.messages.append(
-                {"role": "human", "content": pdf_text})
-            st.chat_message("human").write(pdf_text)
-
-            # Search using the PDF text directly
-            results = search_milvus(pdf_text)
-
-            # Display results
-            response = f"Top results: {results}"
-            st.session_state.messages.append(
-                {"role": "assistant", "content": response})
-            st.chat_message("assistant").write(response)
-# === HÀM CHÍNH ===
+        st.session_state.messages.append(
+            {"role": "assistant", "content": response})
+        st.chat_message("assistant").write(response)
+        ai_response = generate_answer(prompt, result)
+        # print("AI response: ", ai_response)
+        st.session_state.messages.append(
+            {"role": "assistant", "content": ai_response})
+        # st.chat_message("assistant").write(ai_response)
+        st.chat_message("assistant").write_stream(
+            ai_response)  # stream response
 
 
 def main():
     initialize_app()
     data_source = setup_sidebar()
     setup_chat_interface()
-    handle_user_input(data_source)
+    handle_user_input()
 
 
-# Chạy ứng dụng
 if __name__ == "__main__":
     main()
-
-# streamlit run streamlit_app.py
