@@ -1,9 +1,75 @@
-from pymilvus import connections, FieldSchema, CollectionSchema, DataType, Collection, utility
+from langchain_openai import OpenAIEmbeddings
+from langchain_milvus import Milvus
+from langchain.schema import Document
+from langchain_ollama import OllamaEmbeddings
+from pymilvus import connections, Collection, utility
 import os
+
+
+def connect_to_milvus(URI_link: str, collection_name: str, use_ollama: bool = False) -> Milvus:
+    if use_ollama:
+        embeddings = OllamaEmbeddings(model="llama2:7b-chat")
+    else:
+        embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+    vectorstore = Milvus(
+        embedding_function=embeddings,
+        connection_args={"uri": URI_link},
+        collection_name=collection_name
+    )
+    return vectorstore
+
+
+def search_milvus(query_text: str, collection_name: str = "data_ctu", top_k: int = 5):
+    vectorstore = connect_to_milvus('http://localhost:19530', collection_name)
+    # print("Milvus connection: ", vectorstore)
+    results = vectorstore.similarity_search(query_text, k=top_k)
+    return results
+
+
+def seed_milvus(URI_link: str, documents: list, collection_name: str = "data_ctu", use_ollama: bool = False) -> Milvus:
+    print("Seeding Milvus...")
+    if use_ollama:
+        embeddings = OllamaEmbeddings(model="llama2:7b-chat")
+    else:
+        embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+    all_documents = []
+    for doc in documents:
+        if isinstance(doc, dict):
+            new_doc = Document(
+                page_content=doc["page_content"],
+                metadata=doc["metadata"]
+            )
+        else:
+            new_doc = Document(
+                page_content=doc.page_content,
+                metadata=doc.metadata
+            )
+        all_documents.append(new_doc)
+    vectorstore = Milvus.from_documents(
+        all_documents,
+        embeddings,
+        collection_name=collection_name,
+        connection_args={"uri": URI_link},
+    )
+    return vectorstore
+
+
+def load_data(URI_link, collection_name: str = "data_ctu", use_ollama: bool = False):
+    if use_ollama:
+        embeddings = OllamaEmbeddings(model="llama2:7b-chat")
+    else:
+        embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+    vector_store_loaded = Milvus(
+        embeddings,
+        connection_args={"uri": URI_link},
+        collection_name=collection_name,
+    )
+    return vector_store_loaded
+
 
 MILVUS_HOST = os.getenv("MILVUS_HOST", "localhost")
 MILVUS_PORT = os.getenv("MILVUS_PORT", "19530")
-COLLECTION_NAME = "chatbot_collection"
+COLLECTION_NAME = "data_ctu"
 
 
 def init_milvus():
@@ -14,56 +80,7 @@ def init_milvus():
     if utility.has_collection(COLLECTION_NAME):
         collection = Collection(name=COLLECTION_NAME)
     else:
-        # Định nghĩa các field cho schema
-        fields = [
-            FieldSchema(name="id", dtype=DataType.VARCHAR,
-                        max_length=64, is_primary=True, auto_id=False),
-            FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=384)
-        ]
-        schema = CollectionSchema(fields, "Chatbot Embeddings")
-        collection = Collection(name=COLLECTION_NAME, schema=schema)
-
-        # Tạo index cho hiệu suất tìm kiếm
-        index_params = {
-            "index_type": "IVF_FLAT",
-            "metric_type": "L2",
-            "params": {"nlist": 128}
-        }
-        collection.create_index("embedding", index_params)
+        print("Collection does not exist. Creating new collection...")
+        collection = Collection(name=COLLECTION_NAME)
 
     return collection
-
-
-collection = init_milvus()
-
-
-def insert_embeddings(doc_id, embedding):
-    """Chèn một embedding mới vào Milvus."""
-    data = [
-        [doc_id],         # id
-        [embedding]       # embedding
-    ]
-    collection.insert(data)
-    collection.load()
-
-
-def delete_embedding(doc_id):
-    """Xóa một embedding khỏi Milvus dựa trên doc_id."""
-    expr = f'id == "{doc_id}"'
-    collection.delete(expr)
-
-
-def search_embeddings(query_embedding, top_k=5):
-    """Tìm kiếm các embeddings tương tự trong Milvus."""
-    search_params = {
-        "metric_type": "L2",
-        "params": {"nprobe": 10}
-    }
-    results = collection.search(
-        [query_embedding],
-        "embedding",
-        search_params,
-        limit=top_k,
-        output_fields=["id"]
-    )
-    return results[0]

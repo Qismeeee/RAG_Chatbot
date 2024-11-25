@@ -100,7 +100,7 @@ def correct_all_files(input_dir, output_dir):
             process_file(file_path, output_dir)
 
 
-def process_uploaded_file(file_path):
+def process_uploaded_file(file_path, collection_name="data_ctu", use_ollama_embeddings=False):
     processed_files = load_processed_files()
     # processed_files = {}
     file_hash = compute_file_hash(file_path)
@@ -115,7 +115,8 @@ def process_uploaded_file(file_path):
 
         load_document(file_path, temp_input)
 
-        chunk_documents(temp_input, temp_output, PROCESSED_FILES_PATH)
+        chunk_documents(temp_input, temp_output, PROCESSED_FILES_PATH,
+                        collection_name, use_ollama_embeddings)
 
         # Đánh dấu chunking đã hoàn thành
         if file_hash not in processed_files:
@@ -125,3 +126,21 @@ def process_uploaded_file(file_path):
 
         shutil.rmtree(temp_output)
         shutil.rmtree(temp_input)
+
+
+def handle_upload_file(file, collection_name, use_ollama_embeddings=False):
+    temp_dir = "data/temp_files"
+    if not os.path.exists(temp_dir):
+        os.makedirs(temp_dir, exist_ok=True)
+
+    file_location = f"{temp_dir}/{file.name}"
+
+    # Save the uploaded file to the temporary directory
+    with open(file_location, "wb") as f:
+        f.write(file.read())
+
+    print("File uploaded: ", file_location)
+
+    # Xử lý file và lấy doc_ids
+    process_uploaded_file(file_location, collection_name,
+                          use_ollama_embeddings)

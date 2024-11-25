@@ -6,9 +6,9 @@ import openai
 import hashlib
 from dotenv import load_dotenv
 from preprocessing.docsLoader import langchain_document_loader
-from src.preprocessing.chunking import chunk_documents
-from src.preprocessing.embedding import process_embeddings
-from src.embeddings.faiss_index import FaissIndex
+from preprocessing.chunking import chunk_documents
+from preprocessing.embedding import process_embeddings
+from embeddings.faiss_index import FaissIndex
 
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")

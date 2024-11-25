@@ -108,7 +108,7 @@ def save_data_locally(documents, filename, directory):
     file_path = os.path.join(directory, filename)
 
     for i, doc in enumerate(documents):
-        file = f"raw/{i}_{doc.metadata['title'].replace("/", "_")}"
+        file = f"raw/{i}_{doc.metadata['title'].replace('/', '_')}"
         data_save = {'page_content': doc.page_content,
                      'metadata': doc.metadata}
         with open(file, 'w', encoding='utf-8') as file:

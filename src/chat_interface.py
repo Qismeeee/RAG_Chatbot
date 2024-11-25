@@ -2,7 +2,6 @@ import openai
 from openai import OpenAI
 import os
 import json
-from database import search_embeddings, collection
 from sentence_transformers import SentenceTransformer
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -42,42 +41,7 @@ def speech_to_text(audio_data):
     return transcript
 
 
-async def generate_answer_stream(question, session_id=None, model_name="gpt-3.5-turbo"):
-    conversation = []
-    if session_id:
-        conversation = load_conversation(session_id)
-    query_embedding = create_embedding(question)
-    search_results = search_embeddings(query_embedding, top_k=5)
-    retrieved_texts = []
-    for result in search_results:
-        doc_id = result.id
-        retrieved_texts.append(f"Document ID: {doc_id}")
-
-    context = "\n".join(retrieved_texts)
-    conversation.append(
-        {"role": "user", "content": f"{question}\nContext:\n{context}"})
-
-    response = client.chat.completions.create(
-        model=model_name,
-        messages=conversation,
-        stream=True
-    )
-
-    assistant_reply = ""
-    for chunk in response:
-        if 'choices' in chunk:
-            delta = chunk['choices'][0]['delta']
-            if 'content' in delta:
-                text = delta['content']
-                assistant_reply += text
-                yield f"data: {text}\n\n"
-
-    if session_id:
-        conversation.append({"role": "assistant", "content": assistant_reply})
-        save_conversation(session_id, conversation)
-
-
-def generate_answer(question, search_results, stream=True,  session_id=None, model_name="gpt-4o"):
+def generate_answer(question, search_results, stream=True,  session_id=None, model_name="gpt-4o-mini"):
     conversation = []
     if session_id:
         conversation = load_conversation(session_id)
@@ -86,10 +50,10 @@ def generate_answer(question, search_results, stream=True,  session_id=None, mod
         {
             "role": "system",
             "content": (
-                "You are CTU Bot, an AI assistant specialized in answering questions about the regulations, "
-                "policies, and general information of Can Tho University. Your task is to provide clear, "
-                "concise, and accurate answers to help students with their inquiries. Feel free to ask anything.\n\n"
-                f"Document information:\n{search_results}"
+                "Bạn là trợ lý ảo CTU, một trợ lý AI chuyên biệt hỏi đáp về các quy định, chính sách và "
+                "thông tin liên quan của Đại học Cần Thơ. Nhiệm vụ của bạn là cung cấp câu trả lời chính xác, "
+                "cô đọng, xúc tích cho sinh viên dựa trên thông tin được cung cấp. Dưới đây là các tài liệu liên quan: " 
+                f"TÀI LIỆU:\n{search_results}"
             )
         },
         {
