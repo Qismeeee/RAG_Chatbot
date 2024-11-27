@@ -37,7 +37,7 @@ def initialize_app():
 
 
 def setup_header():
-    st.image("../images/logoCTU.png", width=300)
+    st.image("D:/HK1_2024-2025/Chatbot/Chat/images/logoCTU.png", width=300)
     st.markdown(
         """
         <div style="text-align: center; margin-top: -10px; font-size: 18px; color: black; background-color: #FFFF00; padding: 10px; border-radius: 10px;">
@@ -63,7 +63,8 @@ def setup_sidebar():
             "Chọn Embeddings Model:",
             ["OpenAI", "Ollama"]
         )
-        use_ollama_embeddings = (embeddings_choice == "Ollama")
+        # use_ollama_embeddings = (embeddings_choice == "Ollama")
+        use_ollama_embeddings = False
 
         st.header("📚 Nguồn dữ liệu")
         data_source = st.radio(
@@ -106,6 +107,7 @@ def handle_local_file(use_ollama_embeddings: bool):
                 print(f"Lỗi khi xử lý file PDF: {str(e)}")
                 print("Error: ", traceback.format_exc())
                 st.toast(f"Lỗi khi xử lý file PDF: {str(e)}")
+    files = []
 
 
 def handle_url_input(use_ollama_embeddings: bool):
@@ -135,15 +137,16 @@ def handle_url_input(use_ollama_embeddings: bool):
                 text_splitter = RecursiveCharacterTextSplitter(
                     chunk_size=4096, chunk_overlap=200)
                 all_splits = text_splitter.split_documents(filtered_documents)
-                
+
                 all_chunks = []
                 for i, chunk in enumerate(all_splits, start=1):
                     # print("Chunk metadata: ", chunk.metadata.keys())
-                    chunk_metadata = {"source": chunk.metadata["source"], "original_text": ""}
+                    chunk_metadata = {
+                        "source": chunk.metadata["source"], "original_text": ""}
                     chunk_metadata.update({
                         "chunk_number": i,
                         "doc_id": generate_doc_id(chunk, chunk_metadata["source"], i),
-                        "filename": chunk.metadata["title"] 
+                        "filename": chunk.metadata["title"]
                     })
 
                     output_data = {
@@ -194,9 +197,9 @@ def setup_chat_interface(model_choice="OpenAI GPT-4o"):
         # msgs.add_ai_message(
         #     "Chào mừng bạn đến với CTU Chabot Assistant! Tôi có thể hỗ trợ gì cho bạn?")
 
-    for msg in st.session_state.messages:
-        role = "assistant" if msg["role"] == "assistant" else "human"
-        st.chat_message(role).write(msg["content"])
+    # for msg in st.session_state.messages:
+    #     role = "assistant" if msg["role"] == "assistant" else "human"
+    #     st.chat_message(role).write(msg["content"])
 
     return msgs
 
@@ -219,19 +222,13 @@ def handle_user_input():
 
             prompt = speech_to_text(webm_file_path)
             os.remove(webm_file_path)
-            # if transcript:
-            #     st.session_state.messages.append({"role": "user", "content": transcript})
-            #     with st.chat_message("user"):
-            #         st.write(transcript)
-            #     os.remove(webm_file_path)
+
     if prompt:
-        st.session_state.messages.append(
-            {"role": "human", "content": prompt})
+        st.session_state.messages.append({"role": "human", "content": prompt})
         st.chat_message("human").write(prompt)
 
         results = search_milvus(prompt)
         print("PROMT: ", prompt)
-        # print("RESULTS: ", results)
 
         formatted_results = []
         for doc in results:
@@ -241,7 +238,6 @@ def handle_user_input():
                 "chunk_number": doc.metadata.get("chunk_number", "Unknown")
             })
 
-        # Display results
         response = "Kết quả tìm kiếm:\n\n"
         for idx, result in enumerate(formatted_results, 1):
             response += f"{idx}. Nguồn: {result['source']}\n"
@@ -250,14 +246,15 @@ def handle_user_input():
 
         st.session_state.messages.append(
             {"role": "assistant", "content": response})
-        st.chat_message("assistant").write(response)
-        ai_response = generate_answer(prompt, result)
-        # print("AI response: ", ai_response)
+
+        # Use st.expander to hide/show search results
+        with st.expander("Nhấn để xem kết quả tìm kiếm"):
+            st.write(response)
+
+        ai_response = generate_answer(prompt, results)
         st.session_state.messages.append(
             {"role": "assistant", "content": ai_response})
-        # st.chat_message("assistant").write(ai_response)
-        st.chat_message("assistant").write_stream(
-            ai_response)  # stream response
+        st.chat_message("assistant").write_stream(ai_response)
 
 
 def main():
