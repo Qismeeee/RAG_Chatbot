@@ -1,3 +1,4 @@
+import numpy as np
 from langchain_openai import OpenAIEmbeddings
 from langchain_milvus import Milvus
 from langchain.schema import Document
@@ -11,6 +12,7 @@ def connect_to_milvus(URI_link: str, collection_name: str, use_ollama: bool = Fa
         embeddings = OllamaEmbeddings(model="llama2:7b-chat")
     else:
         embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+   
     vectorstore = Milvus(
         embedding_function=embeddings,
         connection_args={"uri": URI_link},
@@ -31,7 +33,9 @@ def seed_milvus(URI_link: str, documents: list, collection_name: str = "data_ctu
     if use_ollama:
         embeddings = OllamaEmbeddings(model="llama2:7b-chat")
     else:
-        embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+        embeddings = OpenAIEmbeddings(model="text-embedding-3-large", embedding_ctx_length=4096)
+
+   
     all_documents = []
     for doc in documents:
         if isinstance(doc, dict):
@@ -58,9 +62,10 @@ def load_data(URI_link, collection_name: str = "data_ctu", use_ollama: bool = Fa
     if use_ollama:
         embeddings = OllamaEmbeddings(model="llama2:7b-chat")
     else:
-        embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+        embeddings = OpenAIEmbeddings(model="text-embedding-3-large", embedding_ctx_length=4096)
+   
     vector_store_loaded = Milvus(
-        embeddings,
+        embedding_function=embeddings,
         connection_args={"uri": URI_link},
         collection_name=collection_name,
     )
