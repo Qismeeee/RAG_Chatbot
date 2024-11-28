@@ -16,6 +16,8 @@ from audio_recorder_streamlit import audio_recorder
 import re
 
 from bs4 import BeautifulSoup
+from feedback import analyze_feedback, save_feedback_to_db
+import time
 
 
 def bs4_extractor(html: str) -> str:
@@ -53,6 +55,9 @@ def setup_sidebar():
         setup_header()
         st.title("⚙️ Cấu hình CTU Chatbot Assistant")
 
+        if st.button("Xem Dashboard"):
+            st.session_state.page = "dashboard"
+
         st.header("🤖 Model AI")
         model_choice = st.radio(
             "Chọn AI Model để trả lời:",
@@ -63,7 +68,6 @@ def setup_sidebar():
             "Chọn Embeddings Model:",
             ["OpenAI", "Ollama"]
         )
-        # use_ollama_embeddings = (embeddings_choice == "Ollama")
         use_ollama_embeddings = False
 
         st.header("📚 Nguồn dữ liệu")
@@ -247,7 +251,6 @@ def handle_user_input():
         st.session_state.messages.append(
             {"role": "assistant", "content": response})
 
-        # Use st.expander to hide/show search results
         with st.expander("Nhấn để xem kết quả tìm kiếm"):
             st.write(response)
 
@@ -256,12 +259,91 @@ def handle_user_input():
             {"role": "assistant", "content": ai_response})
         st.chat_message("assistant").write_stream(ai_response)
 
+        # Lưu trữ response để sử dụng cho feedback
+        st.session_state.current_response = ai_response
+        st.session_state.current_query = prompt
+
+        # Tạo các nút feedback
+        col_buttons = st.columns(2)
+
+        with col_buttons[0]:
+            if st.button("👍 Like", key="like_button", use_container_width=True):
+                if save_feedback_to_db(st.session_state.current_query,
+                                       st.session_state.current_response,
+                                       'like'):
+                    st.success("Cảm ơn bạn đã thích câu trả lời!")
+                else:
+                    st.error("Có lỗi xảy ra khi lưu phản hồi!")
+
+        with col_buttons[1]:
+            if st.button("👎 Dislike", key="dislike_button", use_container_width=True):
+                if save_feedback_to_db(st.session_state.current_query,
+                                       st.session_state.current_response,
+                                       'dislike'):
+                    st.error("Cảm ơn bạn đã phản hồi! Chúng tôi sẽ cải thiện.")
+                else:
+                    st.error("Có lỗi xảy ra khi lưu phản hồi!")
+
+
+def setup_dashboard():
+    st.title("Dashboard Phản Hồi")
+
+    # Thêm hai nút vào cùng một hàng
+    col1, col2 = st.columns([1, 1])  # Chia bố cục thành 2 cột đều nhau
+
+    with col1:
+        if st.button("🔄 Làm mới dữ liệu", use_container_width=True):
+            st.experimental_rerun()
+
+    with col2:
+        if st.button("← Quay lại", use_container_width=True):
+            st.session_state.page = "chat"
+            st.experimental_rerun()
+
+    feedback_data = analyze_feedback()
+    st.subheader("Thống Kê Phản Hồi")
+
+    if not feedback_data:
+        st.warning("Không có dữ liệu phản hồi nào để hiển thị.")
+        return
+
+    # Tính toán thống kê
+    total_feedback = sum(count for _, count, _ in feedback_data)
+    feedback_dict = {feedback: count for feedback, count, _ in feedback_data}
+    like_count = feedback_dict.get('like', 0)
+    dislike_count = feedback_dict.get('dislike', 0)
+
+    # Hiển thị thống kê
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.metric("Tổng số phản hồi", total_feedback)
+
+    with col2:
+        st.metric("Số lượng Like", like_count)
+
+    with col3:
+        st.metric("Số lượng Dislike", dislike_count)
+
+    # Hiển thị tỷ lệ
+    if total_feedback > 0:
+        like_percentage = (like_count / total_feedback) * 100
+        st.progress(like_percentage / 100)
+        st.write(f"Tỷ lệ hài lòng: {like_percentage:.1f}%")
+
 
 def main():
     initialize_app()
-    data_source = setup_sidebar()
-    setup_chat_interface()
-    handle_user_input()
+    model_choice, collection_to_query = setup_sidebar()
+
+    if 'page' not in st.session_state:
+        st.session_state.page = "chat"
+
+    if st.session_state.page == "dashboard":
+        setup_dashboard()
+    else:
+        setup_chat_interface(model_choice)
+        handle_user_input()
 
 
 if __name__ == "__main__":
