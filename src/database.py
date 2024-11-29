@@ -24,7 +24,7 @@ def connect_to_milvus(URI_link: str, collection_name: str, use_ollama: bool = Fa
 def search_milvus(query_text: str, collection_name: str = "data_ctu", top_k: int = 5):
     vectorstore = connect_to_milvus('http://localhost:19530', collection_name)
     # print("Milvus connection: ", vectorstore)
-    results = vectorstore.similarity_search(query_text, k=top_k)
+    results = vectorstore.similarity_search(query_text, k=top_k) 
     return results
 
 

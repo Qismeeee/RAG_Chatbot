@@ -31,7 +31,7 @@ def create_embedding(text):
     return embedding.tolist()
 
 
-def speech_to_text(audio_data):
+def speech_to_text(audio_data): 
     with open(audio_data, "rb") as audio_file:
         transcript = client.audio.transcriptions.create(
             model="whisper-1",
@@ -40,8 +40,7 @@ def speech_to_text(audio_data):
         )
     return transcript
 
-
-def generate_answer(question, search_results, stream=True,  session_id=None, model_name="gpt-4o-mini"):
+def generate_answer(question, search_results, stream=True, session_id=None, model_name="gpt-4o-mini"): 
     conversation = []
     if session_id:
         conversation = load_conversation(session_id)
@@ -52,7 +51,7 @@ def generate_answer(question, search_results, stream=True,  session_id=None, mod
             "content": (
                 "Bạn là trợ lý ảo CTU, một trợ lý AI chuyên biệt hỏi đáp về các quy định, chính sách và "
                 "thông tin liên quan của Đại học Cần Thơ. Nhiệm vụ của bạn là cung cấp câu trả lời chính xác, "
-                "cô đọng, xúc tích cho sinh viên dựa trên thông tin được cung cấp. Dưới đây là các tài liệu liên quan: " 
+                "cô đọng, xúc tích cho sinh viên dựa trên thông tin được cung cấp. Dưới đây là các tài liệu liên quan: "
                 f"TÀI LIỆU:\n{search_results}"
             )
         },
@@ -76,6 +75,7 @@ def generate_answer(question, search_results, stream=True,  session_id=None, mod
             model=model_name,
             messages=conversation
         ).choices[0].message.content.strip()
+
     if session_id:
         conversation.append({"role": "assistant", "content": response})
         save_conversation(session_id, conversation)

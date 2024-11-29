@@ -40,10 +40,9 @@ def save_text_to_json(text, metadata, output_path):
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
-
-def langchain_document_loader(TMP_DIR):
+def langchain_document_loader(TMP_DIR, output_dir):
     documents = []
-    output_dir = "D:/HK1_2024-2025/Chatbot/Chat/data/processed"
+    # output_dir = "data/processed"
     os.makedirs(output_dir, exist_ok=True)
 
     txt_loader = DirectoryLoader(
@@ -103,6 +102,7 @@ def langchain_document_loader(TMP_DIR):
     documents.extend(docx_loader.load())
 
     return documents
+
 def load_document(file, output_dir):
     assert(file.endswith(".pdf"), "Now only accept pdf file!")
     documents = []

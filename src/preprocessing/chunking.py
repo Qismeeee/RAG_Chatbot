@@ -1,7 +1,10 @@
 import os
+import sys
 import json
 import hashlib
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from preprocessing.docsLoader import langchain_document_loader
 
 from database import seed_milvus
 
@@ -44,15 +47,11 @@ def chunk_documents(input_dir, output_dir, processed_files_path, collection_name
         file_path = os.path.join(input_dir, filename)
         base_filename = os.path.splitext(filename)[0]
 
-        # Tính hash của tệp
         file_hash = compute_file_hash(file_path)
-
-        # Kiểm tra xem tệp đã được xử lý chưa
         if filename in processed_files and processed_files[filename] == file_hash:
             print(f"File {filename} đã được chunking trước đó. Bỏ qua.")
-            continue  # Bỏ qua tệp đã được xử lý
+            continue  
 
-        # Tiến hành xử lý tệp
         if filename.endswith(".txt"):
             text = load_text_content(file_path)
             metadata = {"source": filename, "original_text": text}
@@ -70,8 +69,11 @@ def chunk_documents(input_dir, output_dir, processed_files_path, collection_name
             chunk_metadata.update({
                 "chunk_number": i,
                 "doc_id": generate_doc_id(chunk, filename, i),
-                "filename": filename  # Thêm tên tệp vào metadata
+                "filename": filename  
             })
+            for field in ['source', 'page_number', 'original_text', 'chunk_number', 'doc_id', 'filename']:
+                if field not in chunk_metadata:
+                    chunk_metadata[field] = 0
             print("Chunk metadata: ", chunk_metadata.keys())
 
             output_data = {
@@ -88,13 +90,9 @@ def chunk_documents(input_dir, output_dir, processed_files_path, collection_name
                 'http://localhost:19530', [output_data], collection_name, use_ollama_embeddings)
             print(f"Saved chunk {i} to {output_path}")
 
-        # Cập nhật thông tin tệp đã xử lý
         processed_files[filename] = file_hash
-
-    # Lưu lại danh sách tệp đã xử lý
     save_processed_files(processed_files, processed_files_path)
 
-# Các hàm hỗ trợ cho xử lý file đã được xử lý
 
 
 def compute_file_hash(file_path):
@@ -117,10 +115,12 @@ def save_processed_files(processed_files, processed_files_path):
     with open(processed_files_path, 'w') as f:
         json.dump(processed_files, f, indent=4)
 
+def prepare_milvus_data():
+    input_directory = "data/milvus_processed"
+    output_directory = "data/milvus_chunks"
+    langchain_document_loader("../data/downloads", input_directory)
+    chunk_documents(input_directory, output_directory, "data/new_milvus_processed_files.json")
 
 # Sử dụng
 if __name__ == "__main__":
-    input_directory = "data/corrected"
-    output_directory = "data/chunks"
-    processed_files_json = "data/processed_files_chunking.json"
-    chunk_documents(input_directory, output_directory, processed_files_json)
+    prepare_milvus_data()
